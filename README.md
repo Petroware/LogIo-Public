@@ -45,7 +45,7 @@ Java: https://petroware.no/logio/javadoc/index.html
 
 ## Programming examples
 
-### Write
+### JSON Write
 
 An example for creating a JSON Well Log file from scratch is shown below:
 
@@ -69,7 +69,7 @@ jsonFile.setField("Ekofisk");
 JsonCurve c1 = new JsonCurve("MD", "Measured depth", "length", "m", Class.double, 1);
 jsonFile.addCurve(c1);
 
-JsonCurve c2 = new JsonCurve("RES", "Resistivity", "electrical resistivity", "ohm metre", Class.double, 1);
+JsonCurve c2 = new JsonCurve("RES", "Resistivity", "electrical resistivity", "ohm.m", Class.double, 1);
 jsonFile.addCurve(c2);
 
 // Add curve data
@@ -77,11 +77,14 @@ c1.addValue(1000.0);
 c1.addValue(1001.0);
 c1.addValue(1002.0);
 :
+c1.addValue(1349.0);
 
 c2.addValue(127.3);
 c2.addValue(92.16);
 c2.addValue(null);
 :
+c2.addValue(118.871);
+
 
 // Write to file
 JsonFileWriter fileWriter = new JsonFileWriter(new File("path/to/file.JSON", true, 2);
@@ -111,10 +114,10 @@ This will create the following file:
            "dimensions": 1
          },
          {
-           "name": "A40H",
-           "description": "Attenuation resistivity 40 inch",
+           "name": "RES",
+           "description": "Resistivity",
            "quantity": "electrical resistivity",
-           "unit": "ohm metre",
+           "unit": "ohm.m",
            "valueType": "float",
            "dimensions": 1
          }
@@ -131,7 +134,7 @@ This will create the following file:
    }
 ```
 
-### Read
+### JSON Read
 
 Reading a JSON Well Log file is shown below:
 
@@ -146,7 +149,7 @@ JsonFileReader fileReader = new JsonFileReader(new File("path/to/file.JSON"));
 List<JsonFile> jsonFiles = fileReader.read(true, false, null);
 ```
 
-From this point navigate the JsonFile instances to get curve and metadata.
+From this point just navigate the JsonFile instances to get curves and metadata.
 
 
 # About Petroware
