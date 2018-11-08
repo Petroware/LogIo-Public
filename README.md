@@ -144,12 +144,15 @@ import no.petroware.logio.json.JsonFileReader;
 
 :
 
-// Create an empty JSON file instance
+// Create a JSON Well Log file reader and read to memory
 JsonFileReader fileReader = new JsonFileReader(new File("path/to/file.JSON"));
 List<JsonFile> jsonFiles = fileReader.read(true, false, null);
 ```
 
-From this point just navigate the JsonFile instances to get curves and metadata.
+From this point just navigate the JsonFile instance(s) to access curves and metadata.
+
+If files are larger than physical memory it is possible to process the content
+in a streaming manner by adding a ```JsonDataListener```.
 
 
 # About Petroware
