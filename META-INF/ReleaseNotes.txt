@@ -1,0 +1,130 @@
+2.34 06.11.2018
+o DLIS: Fix logic in DlisUtil.getIndexType(). Java only.
+o ASC: Suspend logging after 100 warnings
+o JSON Well Log Format support
+
+2.33 08.10.2018
+o LIS: Possibility to stream read
+o LIS: Added LisDataListener
+o LIS: Make statistics optional
+
+2.32 15.09.2018
+o DLIS: Possibility to stream read/write
+o DLIS: Added DlisDataListener
+o DLIS: Make statistics optional
+
+2.31 24.08.2018
+o DLIS: Correct statistics capture
+o LIS: Handle curves with same name but of different dimension
+o LIS: Properly read curves with text data
+
+2.30 30.05.2018
+o DLIS: Add logic for handling multiple axes on multidimensional curves
+
+2.29 10.04.2018
+o DLIS: Omit representation code flag for IDENT value components
+  and #values flag for size == 1 value components, to accomodate the special
+  requirements for the FILE-HEADER set according to RP66 V1.0 Section 5.1
+
+2.28 20.02.2018
+o LAS: Allow all numeric curve types in LAS 2.0 files
+o LAS: Tune reading of LAS 3.0 files with empty values
+o LIS: Improve file classifier by allowing file header only
+o LIS: Improve accuracy in LisUtil.getSampleInterval()
+o Include release notes, license, custom manifest and index in the jar file
+
+2.27 02.02.2018
+o Warn if curve lengths are out of sync after read
+o DLIS: Proper reading of UNORM (2-byte unsigned) values
+
+2.26 17.11.2017
+o LAS: Support date indexed LAS 2.0 files
+o LAS: Proper reading of LAS 3.0 section associations
+
+2.25 26.10.2017
+o LIS: Associate "lti" extension with LIS
+o DLIS: Tune classification logic
+
+2.24  06.10.2017
+o DLIS: Implement DLIS representation code 6, VAX single precision floating point
+o LIS: Fix minor regression in LIS writer
+o XTF: Preliminary XTF support
+o BIT: Handle empty slots inside BIT files
+
+2.23 30.05.2017
+o LAS: Rewritten reader
+o DLIS: Improved read performance and memory management
+
+2.22 29.10.2016
+o BIT support
+
+2.21 27.05.2016
+o DLIS: Correctly pad arguments when writing DLIS header
+
+2.20 25.05.2016
+o LIS: Improved LIS reading of multi-dimensional data
+
+2.19 02.05.2016
+o DLIS: Improved no-value handling in reader
+
+2.18 04.03.2016
+o LAS: Properly handle LAS 3.0 containing sub files
+o ASC: Fix reader that always throwed away the curve data
+
+2.17 12.02.2016
+o LIS: Fix concurrency defect in the LIS reader
+
+2.16 26.01.2016
+o New and improved ASC reader
+
+2.15 06.01.2016
+o DLIS: Improved reading performance
+
+2.14 11.12.2015
+o LAS/ASC: Properly handle quoted tokens in ASCII read
+
+2.13 08.10.2015
+o LAS: Improve no-value handling
+
+2.12 20.08.2015
+o ASC: Tune file reader
+o DLIS: Tune read buffer size
+o LIS: Improve reader
+
+2.11 11.08.2015
+o Improve large file reading performance and allow for reading >2GB files
+
+2.10 23.07.2015
+o SPWLA: Tuned the core log reader
+o ASC: Tuned reader. Still far from perfect!
+
+2.09 17.06.2015
+o LIS: Improved reader
+
+2.08 09.06.2015
+o DLIS: Pick interval from index curve if not available as meta-data
+
+2.07 28.05.2015
+o ASC: Introduce initial version of a new and improved reader
+
+2.06 22.05.2015
+o DLIS: Handle interval if there are frames with different index types
+
+2.05 20.05.2015
+o LIS: Improved reader robustness
+
+2.04 20.03.2015
+o SPWLA: Fixed issue on core curve in reader
+
+2.03 13.03.2015
+o SPWLA support
+
+2.02 18.01.2015
+o LIS: Support both known file format types on wellbore
+o Fix defect on file save
+
+2.01 11.12.2014
+o DLIS: Support subfiles
+
+2.00 13.03.2013
+o Initial release

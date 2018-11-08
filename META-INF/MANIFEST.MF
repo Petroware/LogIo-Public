@@ -1,0 +1,13 @@
+Manifest-Version: 1.0
+Specification-Title: Petroware Log I/O
+Specification-Version: 2.28
+Specification-Vendor: Petroware AS
+Specification-Vision: Simplicity is the ultimate sophistication
+Implementation-Title: Petroware Log I/O
+Implementation-Vendor: Petroware AS
+Built-By: main
+GnuMake-Version: 4.2.1
+Build-Time: 2018-02-07 15:00:00
+Build-OS: Windows 7
+Build-Host: hyme.petroware.no
+Build-Jdk: 1.8.0_185

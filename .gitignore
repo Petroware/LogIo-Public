@@ -24,6 +24,11 @@ build/
 dist/
 
 #
+# Makefiles
+#
+**/Makefile
+
+#
 # Temporary files
 #
 *~
