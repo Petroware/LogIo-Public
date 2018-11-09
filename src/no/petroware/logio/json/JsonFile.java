@@ -509,7 +509,7 @@ public final class JsonFile
    *
    * @param operator  Operator name of the log of this JSON file. Null to unset.
    */
-  public void setOpertor(String operator)
+  public void setOperator(String operator)
   {
     setProperty(JsonWellLogProperty.OPERATOR.getTag(), operator);
   }
