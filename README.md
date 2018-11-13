@@ -51,7 +51,7 @@ Java: https://petroware.no/logio/javadoc/index.html
 
 ### JSON Read
 
-Example for reading JSON Well Log file:
+Example for reading a JSON Well Log file:
 
 ```java
 import no.petroware.logio.json.JsonFile;
@@ -59,21 +59,21 @@ import no.petroware.logio.json.JsonReader;
 
 :
 
-// Create a JSON Well Log file reader and read to memory
+// Create a JSON Well Log reader and read to memory
 JsonReader jsonReader = new JsonReader(new File("path/to/file.JSON"));
 List<JsonFile> jsonFiles = jsonReader.read(true, false, null);
 ```
 
-From this point the JsonFile instance(s) can be navigated to access curves
+From this point the ```JsonFile``` instance(s) can be navigated to access curves
 and metadata.
 
 If files are larger than physical memory it is possible to process the content
-in a streaming manner by adding a ```JsonDataListener``` to the ```read``` call.
+in a streaming manner by adding a `JsonDataListener` to the `read()` call.
 
 
 ### JSON Validate
 
-Example for validating JSON Well Log file:
+Example for validating a JSON Well Log file:
 
 ```java
 import no.petroware.logio.json.JsonValidator;
@@ -128,14 +128,14 @@ c2.addValue(null);
 :
 c2.addValue(118.871);
 
-// Write to file
+// Write to file, human readable with 2 space indentation
 JsonWriter jsonWriter = new JsonWriter(new File("path/to/file.JSON", true, 2);
 jsonWriter.write(jsonFile);
 ```
 
 This will produce the following file:
 
-```txt
+```
 {
   "log": {
     "metadata": {
