@@ -13,7 +13,7 @@ import no.petroware.logio.util.Util;
 /**
  * A collection of utilities for the Log I/O JSON module.
  *
- * @author <a href="mailto:info@petroware.no">Petroware AS</a>
+ * @author <a href="mailto:jacob.dreyer@petroware.no">Jacob Dreyer</a>
  */
 final class JsonUtil
 {

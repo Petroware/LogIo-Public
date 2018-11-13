@@ -4,6 +4,7 @@ import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.math.BigDecimal;
@@ -25,10 +26,13 @@ import no.petroware.logio.util.Util;
  *
  * @author <a href="mailto:info@petroware.no">Petroware AS</a>
  */
-public final class JsonFileWriter
+public final class JsonWriter
 {
   /** The physical disk file to write. */
   private final File file_;
+
+  /** The output stream to write. */
+  private final OutputStream outputStream_;
 
   /** True to write in human readable pretty format, false to write dense. */
   private final boolean isPretty_;
@@ -103,16 +107,42 @@ public final class JsonFileWriter
   }
 
   /**
-   * Create a JSON file writer instance.
+   * Create a JSON writer instance.
+   *
+   * @param outputStream  Stream to write. Non-null.
+   * @param isPretty      True to write in human readable pretty format, false
+   *                      to write as dense as possible.
+   * @param indentation   The white space indentation used in pretty print mode. [0,&gt;.
+   *                      If isPretty is false, this setting has no effect.
+   * @throws IllegalArgumentException  If outputStream is null or indentation is out of bounds.
+   */
+  public JsonWriter(OutputStream outputStream, boolean isPretty, int indentation)
+  {
+    if (outputStream == null)
+      throw new IllegalArgumentException("outputStream cannot be null");
+
+    if (isPretty && indentation < 0)
+      throw new IllegalArgumentException("Invalid indentation: " + indentation);
+
+    file_ = null;
+    outputStream_ = outputStream;
+    isPretty_ = isPretty;
+    newline_ = isPretty_ ? "\n" : "";
+    spacing_ = isPretty_ ? " " : "";
+    indentation_ = new Indentation(isPretty ? indentation : 0, "");
+  }
+
+  /**
+   * Create a JSON writer instance.
    *
    * @param file         Disk file to write to. Non-null.
    * @param isPretty     True to write in human readable pretty format, false
    *                     to write as dense as possible.
-   * @param indentation  The indentation used in pretty print mode. [0,&gt;.
+   * @param indentation  The white space indentation used in pretty print mode. [0,&gt;.
    *                     If isPretty is false, this setting has no effect.
    * @throws IllegalArgumentException  If file is null or indentation is out of bounds.
    */
-  public JsonFileWriter(File file, boolean isPretty, int indentation)
+  public JsonWriter(File file, boolean isPretty, int indentation)
   {
     if (file == null)
       throw new IllegalArgumentException("file cannot be null");
@@ -121,6 +151,7 @@ public final class JsonFileWriter
       throw new IllegalArgumentException("Invalid indentation: " + indentation);
 
     file_ = file;
+    outputStream_ = null;
     isPretty_ = isPretty;
     newline_ = isPretty_ ? "\n" : "";
     spacing_ = isPretty_ ? " " : "";
@@ -399,7 +430,7 @@ public final class JsonFileWriter
   public void write(List<JsonFile> jsonFiles)
     throws IOException
   {
-    FileOutputStream outputStream = new FileOutputStream(file_);
+    OutputStream outputStream = file_ != null ? new FileOutputStream(file_) : outputStream_;
     Writer writer = new BufferedWriter(new OutputStreamWriter(outputStream));
 
     writer.write("{");

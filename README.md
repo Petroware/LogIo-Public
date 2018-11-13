@@ -9,10 +9,11 @@ to use programming API.
 
 <img hspace="100" src="https://petroware.no/images/LogIoBox.250.png">
 
-The open source version of Log I/O available here is the Java accessor for the
+The open source version of Log I/O contains the Java accessor for the
 JSON Well Log Format.
 
 Log I/O web page: https://petroware.no/logio.html
+
 
 
 ## Setup
@@ -24,16 +25,17 @@ $ git clone https://github.com/Petroware/LogIo.git
 ```
 
 
+
 ## Dependencies
 
 The JSON Well Log Format accessor depends on the JSON API specification
-and an implementation of this. We are using the official one from Oracle,
-but these can probably be replaced if required:
+and an implementation of this:
 
 ```
 lib/javax.json-api-1.1.3.jar
 lib/javax.json-1.1.3.jar
 ```
+
 
 
 ## API Documentation
@@ -43,16 +45,57 @@ Java: https://petroware.no/logio/javadoc/index.html
 .Net: https://petroware.no/logio/doxygen/index.html
 
 
+
 ## Programming examples
+
+
+### JSON Read
+
+Example for reading JSON Well Log file:
+
+```java
+import no.petroware.logio.json.JsonFile;
+import no.petroware.logio.json.JsonReader;
+
+:
+
+// Create a JSON Well Log file reader and read to memory
+JsonReader jsonReader = new JsonReader(new File("path/to/file.JSON"));
+List<JsonFile> jsonFiles = jsonReader.read(true, false, null);
+```
+
+From this point the JsonFile instance(s) can be navigated to access curves
+and metadata.
+
+If files are larger than physical memory it is possible to process the content
+in a streaming manner by adding a ```JsonDataListener``` to the ```read``` call.
+
+
+### JSON Validate
+
+Example for validating JSON Well Log file:
+
+```java
+import no.petroware.logio.json.JsonValidator;
+
+:
+
+JsonValidator jsonValidator = JsonValidaor.getInstance();
+List<JsonValidator.Message> messages = jsonValidator.validate(new File("path/to/file.JSON"));
+```
+
+The messages are of different severity and points to potential
+problems at specific locations in the input file.
+
 
 ### JSON Write
 
-An example for creating a JSON Well Log file from scratch is shown below:
+Example for creating a JSON Well Log file from scratch:
 
 ```java
 import no.petroware.logio.json.JsonCurve;
 import no.petroware.logio.json.JsonFile;
-import no.petroware.logio.json.JsonFileWriter;
+import no.petroware.logio.json.JsonWriter;
 
 :
 
@@ -85,77 +128,57 @@ c2.addValue(null);
 :
 c2.addValue(118.871);
 
-
 // Write to file
-JsonFileWriter fileWriter = new JsonFileWriter(new File("path/to/file.JSON", true, 2);
-fileWriter.write(jsonFile);
+JsonWriter jsonWriter = new JsonWriter(new File("path/to/file.JSON", true, 2);
+jsonWriter.write(jsonFile);
 ```
 
-This will create the following file:
+This will produce the following file:
 
 ```txt
 {
-     "log": {
-       "metadata": {
-         "name": "EcoScope Data" ,
-         "well": "35/12-6S",
-         "field": "Ekofisk",
-         "startIndex": 1000.0,
-         "endIndex": 1349.0,
-         "step": 1.0
-       },
-       "curves": [
-         {
-           "name": "MD",
-           "description": "Measured depth",
-           "quantity": "length",
-           "unit": "m",
-           "valueType": "float",
-           "dimensions": 1
-         },
-         {
-           "name": "RES",
-           "description": "Resistivity",
-           "quantity": "electrical resistivity",
-           "unit": "ohm.m",
-           "valueType": "float",
-           "dimensions": 1
-         }
-       ]
-       "data": [
-         [1000.0, 127.300],
-         [1001.0,  92.160],
-         [1002.0,    null],
-         :
-         :
-         [1349.0, 112.871]
-       ]
-     }
-   }
+  "log": {
+    "metadata": {
+      "name": "EcoScope Data" ,
+      "well": "35/12-6S",
+      "field": "Ekofisk",
+      "startIndex": 1000.0,
+      "endIndex": 1349.0,
+      "step": 1.0
+    },
+    "curves": [
+      {
+        "name": "MD",
+        "description": "Measured depth",
+        "quantity": "length",
+        "unit": "m",
+        "valueType": "float",
+        "dimensions": 1
+      },
+      {
+        "name": "RES",
+        "description": "Resistivity",
+        "quantity": "electrical resistivity",
+        "unit": "ohm.m",
+        "valueType": "float",
+        "dimensions": 1
+      }
+    ]
+    "data": [
+      [1000.0, 127.300],
+      [1001.0,  92.160],
+      [1002.0,    null],
+      :
+      :
+      [1349.0, 112.871]
+    ]
+  }
+}
 ```
 
-### JSON Read
-
-Reading a JSON Well Log file is shown below:
-
-```java
-import no.petroware.logio.json.JsonFile;
-import no.petroware.logio.json.JsonFileReader;
-
-:
-
-// Create a JSON Well Log file reader and read to memory
-JsonFileReader fileReader = new JsonFileReader(new File("path/to/file.JSON"));
-List<JsonFile> jsonFiles = fileReader.read(true, false, null);
-```
-
-From this point just navigate the JsonFile instance(s) to access curves and metadata.
-
-If files are larger than physical memory it is possible to process the content
-in a streaming manner by adding a ```JsonDataListener```.
 
 
-# About Petroware
+## About Petroware
 
 Petroware AS is a software company within the data management, data analytics,
 petrophysics, geology and reservoir engineering domains.

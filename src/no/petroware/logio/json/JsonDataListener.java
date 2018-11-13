@@ -28,13 +28,13 @@ package no.petroware.logio.json;
 public interface JsonDataListener
 {
   /**
-   * A notification from {@link JsonFileReader} indicating that a new
+   * A notification from {@link JsonReader} indicating that a new
    * portion of data has been read into the specified JSON file.
    * <p>
    * After the client has processed the data, it may clean the curve data
    * in order to save memory storage. See {@link JsonFile#clearCurves}.
    * <p>
-   * @see JsonFileReader#read(boolean,boolean,JsonDataListener)
+   * @see JsonReader#read(boolean,boolean,JsonDataListener)
    *
    * @param jsonFile  JSON file that has been populated with new data.
    *                  Never null.

@@ -174,6 +174,18 @@ public final class JsonCurve
   }
 
   /**
+   * Return the number of values in the specified dimension.
+   *
+   * @param dimension  Dimension to check. [0,nDimension&gt;.
+   * @return           Number of values in the specified dimension. [0,&gt;.
+   */
+  int getNValues(int dimension)
+  {
+    assert dimension >= 0 && dimension < nDimensions_ : "Invalid dimenion: " + dimension;
+    return values_[dimension].size();
+  }
+
+  /**
    * Return a specific value from the given dimension of this curve.
    *
    * @param dimension  Dimension index. [0,nDimensions&gt;.

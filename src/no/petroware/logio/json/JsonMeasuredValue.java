@@ -1,8 +1,8 @@
 package no.petroware.logio.json;
 
 /**
- * A convenience class to capture a JSON object consisting
- * a of a measured value with a corresponing unit, like:
+ * A convenience class to capture an JSON object consisting
+ * a of a measured value with a corresponding unit, like:
  *
  * <pre>
  *   "pressure": {"value": 250.12, "unit": "bar"}

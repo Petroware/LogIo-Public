@@ -2,10 +2,9 @@ package no.petroware.logio.json;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.InputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 import java.util.logging.Level;
@@ -20,12 +19,12 @@ import no.petroware.logio.common.Statistics;
 import no.petroware.logio.util.Util;
 
 /**
- * Class for reading well logs files of JSON format.
+ * Class for reading well logs in the JSON format.
  * * <p>
  * Typical usage:
  *
  * <pre>
- *   JsonFileReader reader = new JsonFileReader(new File("path/to/file");
+ *   JsonReader reader = new JsonReader(new File("path/to/file");
  *   List&lt;JsonFile&gt; jsonFiles = reader.read(true, true, null);
  * </pre>
  * If the curve data is not needed, it is possible to read only the
@@ -33,7 +32,7 @@ import no.petroware.logio.util.Util;
  * <br>
  * <br>
  * <pre>
- *   JsonFileReader reader = new JsonFileReader(new File("path/to/file"));
+ *   JsonReader reader = new JsonReader(new File("path/to/file"));
  *   List&lt;JsonFile&gt; jsonFiles = reader.read(false, false, null);
  *   :
  *   reader.readData(jsonFiles);
@@ -49,13 +48,16 @@ import no.petroware.logio.util.Util;
  *
  * @author <a href="mailto:info@petroware.no">Petroware AS</a>
  */
-public final class JsonFileReader
+public final class JsonReader
 {
   /** The logger instance. */
-  private static final Logger logger_ = Logger.getLogger(JsonFileReader.class.getName());
+  private static final Logger logger_ = Logger.getLogger(JsonReader.class.getName());
 
-  /** The disk file to be read. Non-null. */
+  /** The file to read. Null if read directly from stream. */
   private final File file_;
+
+  /** The stream to be read. Null if read from file. */
+  private final InputStream inputStream_;
 
   /**
    * Create a JSON reader for the specified file instance.
@@ -66,12 +68,28 @@ public final class JsonFileReader
    * @see #read
    * @see #readData
    */
-  public JsonFileReader(File file)
+  public JsonReader(File file)
   {
-    if (file == null)
-      throw new IllegalArgumentException("file cannot be null");
-
     file_ = file;
+    inputStream_ = null;
+  }
+
+  /**
+   * Create a JSON reader for the specified input stream.
+   * The actual reading is done with the read() or readData() methods.
+   * <p>
+   * Note that the client is responsible for closing the stream
+   * after the read operation is complete.
+   *
+   * @param inputStream  Stream to read. Non-null.
+   * @throws IllegalArgumentException  If inputStream is null.
+   * @see #read
+   * @see #readData
+   */
+  public JsonReader(InputStream inputStream)
+  {
+    file_ = null;
+    inputStream_ = inputStream;
   }
 
   /**
@@ -98,7 +116,7 @@ public final class JsonFileReader
     boolean isFileNameMatching = file.getName().toLowerCase(Locale.US).endsWith(".json");
     boolean isContentMatching;
 
-    return isFileNameMatching ? 0.8 : 0.3;
+    return isFileNameMatching ? 0.9 : 0.3;
   }
 
   /**
@@ -123,17 +141,12 @@ public final class JsonFileReader
 
     int curveNo = 0;
     int dimension = 0;
+    int nDimensions = 1;
 
-    int nCurves = jsonFile.getNCurves();
     int level = 0;
 
     while (jsonParser.hasNext()) {
       JsonParser.Event parseEvent = jsonParser.next();
-
-      JsonCurve curve = jsonFile.getCurves().get(curveNo);
-      Statistics statistics = curve.getStatistics();
-      Class<?> valueType = curve.getValueType();
-      int nDimensions = curve.getNDimensions();
 
       if (parseEvent == JsonParser.Event.START_ARRAY) {
         dimension = 0;
@@ -141,15 +154,33 @@ public final class JsonFileReader
       }
 
       else if (parseEvent == JsonParser.Event.END_ARRAY) {
-        curveNo = nDimensions == 1 ? 0 : curveNo + 1;
-        dimension = 0;
+
         level--;
 
-        if (level == 1 && dataListener != null)
-          dataListener.dataRead(jsonFile);
-
+        //
+        // If we get to level 0 we are all done. Validate the metadata index
+        //
         if (level == 0)
           return;
+
+        //
+        // If at level 1 we have reached end of one row
+        //
+        if (level == 1) {
+          curveNo = 0;
+          dimension = 0;
+
+          if (dataListener != null)
+            dataListener.dataRead(jsonFile);
+        }
+
+        //
+        // Otherwise we have reached the end of a n-dim curve
+        //
+        else {
+          curveNo++;
+          dimension = 0;
+        }
       }
 
       else if (parseEvent == JsonParser.Event.START_OBJECT) {
@@ -178,16 +209,25 @@ public final class JsonFileReader
         else if (parseEvent == JsonParser.Event.VALUE_FALSE)
           value = Boolean.FALSE;
 
+        JsonCurve curve = jsonFile.getCurves().get(curveNo);
+        Class<?> valueType = curve.getValueType();
+        nDimensions = curve.getNDimensions();
+        Statistics statistics = curve.getStatistics();
+
         if (shouldCaptureStatistics)
           statistics.push(Util.getAsDouble(value));
 
         if (shouldReadBulkData)
           curve.addValue(dimension, Util.getAsType(value, valueType));
 
-        if (nDimensions == 1 && curveNo < nCurves - 1)
+        // Move on to the next curve or dimension
+        if (nDimensions == 1) {
           curveNo++;
-
-        dimension = nDimensions == 1 ? 0 : dimension + 1;
+          dimension = 0;
+        }
+        else {
+          dimension++;
+        }
       }
     }
 
@@ -378,7 +418,68 @@ public final class JsonFileReader
       }
     }
 
-    throw new IOException("Invalid JSON file: " + file_);
+    throw new IOException("Invalid JSON file: " + (file_ != null ? file_.toString() : inputStream_.toString()));
+  }
+
+  /**
+   * Read data from a set of JSON files where the metadata has
+   * already been read. This will preserve the existing JsonFile
+   * structure in case a JSON file is read in two operations:
+   *
+   * <pre>
+   *   // Read meta data
+   *   List&lt;JsonFile&gt; jsonFiles = reader.read(false, ...);
+   *
+   *   // Read the curve data
+   *   reader.readData(jsonFiles);
+   * </pre>
+   *
+   * There is nothing to gain in performance with this approach
+   * so in case the result is not cached, the following will
+   * be equivalent:
+   *
+   * <pre>
+   *   // Read metadata
+   *   List&lt;JsonFile&gt; jsonFiles = reader.read(false, ...);
+   *
+   *   // Read all the data
+   *   jsonFiles = reader.read(true, ...);
+   * </pre>
+   *
+   * @param jsonFiles     The JSON files to populate. These must be the
+   *                      exact same list as retrieved by calling the
+   *                      #read(false,...) on the same DlisFileReader instance.
+   *                      Otherwise the behavior is unpredictable.
+   * @param shouldCaptureStatistics True to capture statistics per curve during read.
+   *                      Statistics capture will reduce read performance slightly,
+   *                      so set this to false if the statistics are not needed.
+   * @param dataListener  Listener that will be notified when new data has been read.
+   *                      Null if not used.
+   * @throws IllegalArgumentException  If jsonFiles is null.
+   * @throws IOException  If the read operation fails for some reason.
+   */
+  public void readData(List<JsonFile> jsonFiles, boolean shouldCaptureStatistics,
+                       JsonDataListener dataListener)
+    throws IOException
+  {
+    if (jsonFiles == null)
+      throw new IllegalArgumentException("jsonFiles cannot be null");
+
+    // Read everything into a new structure
+    List<JsonFile> newJsonFiles = read(true, shouldCaptureStatistics, dataListener);
+
+    // This is just a simple brain damage check. The client has all possible
+    // ways to get into trouble if calling this method with an arbitrary argument.
+    if (newJsonFiles.size() != jsonFiles.size())
+      throw new IllegalArgumentException("The specified JSON files is incompatible with the original");
+
+    // Move the frame data from the new to the existing
+    for (int i = 0; i < jsonFiles.size(); i++) {
+      JsonFile existingJsonFile = jsonFiles.get(i);
+      JsonFile newJsonFile = newJsonFiles.get(i);
+
+      existingJsonFile.setCurves(newJsonFile.getCurves());
+    }
   }
 
   /**
@@ -399,7 +500,7 @@ public final class JsonFileReader
   {
     List<JsonFile> jsonFiles = new ArrayList<>();
 
-    InputStream inputStream = new FileInputStream(file_);
+    InputStream inputStream = inputStream_ != null ? inputStream_ : new FileInputStream(file_);
     JsonParser jsonParser = Json.createParser(inputStream);
 
     while (jsonParser.hasNext()) {
@@ -422,8 +523,43 @@ public final class JsonFileReader
     }
 
     jsonParser.close();
-    inputStream.close();
+
+    // We only close in the file input case.
+    // Otherwise the client manage the stream.
+    if (file_ != null)
+      inputStream.close();
 
     return jsonFiles;
+  }
+
+  /**
+   * Testing this class.
+   *
+   * @param arguments  Application arguments. Not used.
+   */
+  public static void main(String[] arguments)
+  {
+    File file = new File("C:/Users/main/logdata/json/log1.json");
+    JsonReader reader = new JsonReader(file);
+
+    try {
+      List<JsonFile> jsonFiles = reader.read(true, true, null);
+
+      for (JsonFile jsonFile : jsonFiles) {
+        System.out.println(jsonFile);
+
+        for (String key : jsonFile.getProperties()) {
+          System.out.println(key);
+          Object value = jsonFile.getProperty(key);
+          System.out.println("  " + value + " " + value.getClass());
+        }
+      }
+
+      JsonWriter writer = new JsonWriter(new File("C:/Users/main/logdata/json/log2.json"), true, 2);
+      writer.write(jsonFiles);
+    }
+    catch (Exception e) {
+      e.printStackTrace();
+    }
   }
 }

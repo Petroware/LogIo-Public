@@ -1,6 +1,7 @@
 package no.petroware.logio.json;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
 import java.util.List;
@@ -32,13 +33,39 @@ public final class JsonFile
    */
   private final List<JsonCurve> curves_ = new CopyOnWriteArrayList<>();
 
+  /** Indicate if this instance includes curve data or not. */
+  private boolean hasCurveData_;
+
+  /**
+   * Create a new JSON file instance.
+   *
+   * @param hasCurveData  Indicate if the file includes curve data.
+   */
+  JsonFile(boolean hasCurveData)
+  {
+    hasCurveData_ = hasCurveData;
+  }
+
   /**
    * Create an empty JSON well log file.
    */
   public JsonFile()
   {
+    this(true); // It has all the curve data that exists (none)
+
     // Default empty metadata
     metadata_ = Json.createObjectBuilder().build();
+  }
+
+  /**
+   * Return whether the JSON file instance includes curve data
+   * or not, i.e if only header data was read or created.
+   *
+   * @return  True if bulk (curve) data is present, false otherwise.
+   */
+  public boolean hasCurveData()
+  {
+    return hasCurveData_;
   }
 
   /**
@@ -180,6 +207,35 @@ public final class JsonFile
       objectBuilder.add(key, ISO8601DateParser.toString(value));
 
     setMetadata(objectBuilder.build());
+  }
+
+  /**
+   * Return all the metadata property keys of this JSON file.
+   *
+   * @return  All property keys of this JSON file. Never null.
+   */
+  public List<String> getProperties()
+  {
+    List<String> properties = new ArrayList<>();
+
+    JsonParser jsonParser = Json.createParserFactory(null).createParser(metadata_);
+    jsonParser.next(); // Proceed past the first START_OBJECT
+
+    while (jsonParser.hasNext()) {
+      JsonParser.Event parseEvent = jsonParser.next();
+
+      // Capture keys
+      if (parseEvent == JsonParser.Event.KEY_NAME)
+        properties.add(jsonParser.getString());
+
+      // Proceed past complete objects
+      else if (parseEvent == JsonParser.Event.START_OBJECT)
+        JsonUtil.readJsonObject(jsonParser);
+    }
+
+    jsonParser.close();
+
+    return properties;
   }
 
   /**
@@ -361,7 +417,7 @@ public final class JsonFile
    */
   public String getName()
   {
-    return getPropertyAsString(JsonWellLogProperty.NAME.getTag());
+    return getPropertyAsString(JsonWellLogProperty.NAME.getKey());
   }
 
   /**
@@ -371,7 +427,7 @@ public final class JsonFile
    */
   public void setName(String name)
   {
-    setProperty(JsonWellLogProperty.NAME.getTag(), name);
+    setProperty(JsonWellLogProperty.NAME.getKey(), name);
   }
 
   /**
@@ -381,7 +437,7 @@ public final class JsonFile
    */
   public String getDescription()
   {
-    return getPropertyAsString(JsonWellLogProperty.DESCRIPTION.getTag());
+    return getPropertyAsString(JsonWellLogProperty.DESCRIPTION.getKey());
   }
 
   /**
@@ -391,7 +447,7 @@ public final class JsonFile
    */
   public void setDescription(String description)
   {
-    setProperty(JsonWellLogProperty.DESCRIPTION.getTag(), description);
+    setProperty(JsonWellLogProperty.DESCRIPTION.getKey(), description);
   }
 
   /**
@@ -401,7 +457,7 @@ public final class JsonFile
    */
   public String getWell()
   {
-    return getPropertyAsString(JsonWellLogProperty.WELL.getTag());
+    return getPropertyAsString(JsonWellLogProperty.WELL.getKey());
   }
 
   /**
@@ -411,7 +467,7 @@ public final class JsonFile
    */
   public void setWell(String well)
   {
-    setProperty(JsonWellLogProperty.WELL.getTag(), well);
+    setProperty(JsonWellLogProperty.WELL.getKey(), well);
   }
 
   /**
@@ -421,7 +477,7 @@ public final class JsonFile
    */
   public String getWellbore()
   {
-    return getPropertyAsString(JsonWellLogProperty.WELLBORE.getTag());
+    return getPropertyAsString(JsonWellLogProperty.WELLBORE.getKey());
   }
 
   /**
@@ -431,7 +487,7 @@ public final class JsonFile
    */
   public void setWellbore(String wellbore)
   {
-    setProperty(JsonWellLogProperty.WELLBORE.getTag(), wellbore);
+    setProperty(JsonWellLogProperty.WELLBORE.getKey(), wellbore);
   }
 
   /**
@@ -441,7 +497,7 @@ public final class JsonFile
    */
   public String getField()
   {
-    return getPropertyAsString(JsonWellLogProperty.FIELD.getTag());
+    return getPropertyAsString(JsonWellLogProperty.FIELD.getKey());
   }
 
   /**
@@ -451,7 +507,7 @@ public final class JsonFile
    */
   public void setField(String field)
   {
-    setProperty(JsonWellLogProperty.FIELD.getTag(), field);
+    setProperty(JsonWellLogProperty.FIELD.getKey(), field);
   }
 
   /**
@@ -461,7 +517,7 @@ public final class JsonFile
    */
   public String getCountry()
   {
-    return getPropertyAsString(JsonWellLogProperty.COUNTRY.getTag());
+    return getPropertyAsString(JsonWellLogProperty.COUNTRY.getKey());
   }
 
   /**
@@ -471,7 +527,7 @@ public final class JsonFile
    */
   public void setCountry(String country)
   {
-    setProperty(JsonWellLogProperty.COUNTRY.getTag(), country);
+    setProperty(JsonWellLogProperty.COUNTRY.getKey(), country);
   }
 
   /**
@@ -481,7 +537,7 @@ public final class JsonFile
    */
   public Date getDate()
   {
-    return getPropertyAsDate(JsonWellLogProperty.DATE.getTag());
+    return getPropertyAsDate(JsonWellLogProperty.DATE.getKey());
   }
 
   /**
@@ -491,7 +547,7 @@ public final class JsonFile
    */
   public void setDate(Date date)
   {
-    setProperty(JsonWellLogProperty.DATE.getTag(), date);
+    setProperty(JsonWellLogProperty.DATE.getKey(), date);
   }
 
   /**
@@ -501,7 +557,7 @@ public final class JsonFile
    */
   public String getOperator()
   {
-    return getPropertyAsString(JsonWellLogProperty.OPERATOR.getTag());
+    return getPropertyAsString(JsonWellLogProperty.OPERATOR.getKey());
   }
 
   /**
@@ -511,7 +567,7 @@ public final class JsonFile
    */
   public void setOperator(String operator)
   {
-    setProperty(JsonWellLogProperty.OPERATOR.getTag(), operator);
+    setProperty(JsonWellLogProperty.OPERATOR.getKey(), operator);
   }
 
   /**
@@ -521,7 +577,7 @@ public final class JsonFile
    */
   public String getServiceCompany()
   {
-    return getPropertyAsString(JsonWellLogProperty.SERVICE_COMPANY.getTag());
+    return getPropertyAsString(JsonWellLogProperty.SERVICE_COMPANY.getKey());
   }
 
   /**
@@ -531,7 +587,7 @@ public final class JsonFile
    */
   public void setServiceCompany(String serviceCompany)
   {
-    setProperty(JsonWellLogProperty.SERVICE_COMPANY.getTag(), serviceCompany);
+    setProperty(JsonWellLogProperty.SERVICE_COMPANY.getKey(), serviceCompany);
   }
 
   /**
@@ -541,7 +597,7 @@ public final class JsonFile
    */
   public String getRunNumber()
   {
-    return getPropertyAsString(JsonWellLogProperty.RUN_NUMBER.getTag());
+    return getPropertyAsString(JsonWellLogProperty.RUN_NUMBER.getKey());
   }
 
   /**
@@ -551,7 +607,7 @@ public final class JsonFile
    */
   public void setRunNumber(String runNumber)
   {
-    setProperty(JsonWellLogProperty.RUN_NUMBER.getTag(), runNumber);
+    setProperty(JsonWellLogProperty.RUN_NUMBER.getKey(), runNumber);
   }
 
   /**
@@ -579,9 +635,9 @@ public final class JsonFile
   {
     Class<?> indexValueType = getIndexValueType();
     if (indexValueType == Date.class)
-      return getPropertyAsDate(JsonWellLogProperty.START_INDEX.getTag());
+      return getPropertyAsDate(JsonWellLogProperty.START_INDEX.getKey());
 
-    return getPropertyAsDouble(JsonWellLogProperty.START_INDEX.getTag());
+    return getPropertyAsDouble(JsonWellLogProperty.START_INDEX.getKey());
   }
 
   /**
@@ -594,9 +650,9 @@ public final class JsonFile
   public void setStartIndex(Object startIndex)
   {
     if (startIndex instanceof Date)
-      setProperty(JsonWellLogProperty.START_INDEX.getTag(), (Date) startIndex);
+      setProperty(JsonWellLogProperty.START_INDEX.getKey(), (Date) startIndex);
     else
-      setProperty(JsonWellLogProperty.START_INDEX.getTag(), Util.getAsDouble(startIndex));
+      setProperty(JsonWellLogProperty.START_INDEX.getKey(), Util.getAsDouble(startIndex));
   }
 
   /**
@@ -612,9 +668,9 @@ public final class JsonFile
   {
     Class<?> indexValueType = getIndexValueType();
     if (indexValueType == Date.class)
-      return getPropertyAsDate(JsonWellLogProperty.END_INDEX.getTag());
+      return getPropertyAsDate(JsonWellLogProperty.END_INDEX.getKey());
 
-    return getPropertyAsDouble(JsonWellLogProperty.END_INDEX.getTag());
+    return getPropertyAsDouble(JsonWellLogProperty.END_INDEX.getKey());
   }
 
   /**
@@ -627,9 +683,9 @@ public final class JsonFile
   public void setEndIndex(Object endIndex)
   {
     if (endIndex instanceof Date)
-      setProperty(JsonWellLogProperty.END_INDEX.getTag(), (Date) endIndex);
+      setProperty(JsonWellLogProperty.END_INDEX.getKey(), (Date) endIndex);
     else
-      setProperty(JsonWellLogProperty.END_INDEX.getTag(), Util.getAsDouble(endIndex));
+      setProperty(JsonWellLogProperty.END_INDEX.getKey(), Util.getAsDouble(endIndex));
   }
 
   /**
@@ -643,7 +699,7 @@ public final class JsonFile
    */
   public Double getStep()
   {
-    return getPropertyAsDouble(JsonWellLogProperty.STEP.getTag());
+    return getPropertyAsDouble(JsonWellLogProperty.STEP.getKey());
   }
 
   /**
@@ -655,7 +711,7 @@ public final class JsonFile
    */
   public void setStep(Double step)
   {
-    setProperty(JsonWellLogProperty.STEP.getTag(), step);
+    setProperty(JsonWellLogProperty.STEP.getKey(), step);
   }
 
   /**
@@ -681,6 +737,25 @@ public final class JsonFile
   public List<JsonCurve> getCurves()
   {
     return Collections.unmodifiableList(curves_);
+  }
+
+  /**
+   * Replace the present set of curves.
+   * <p>
+   * This method is called by the reader to populate a JsonFile instance
+   * that initially was read without bulk data.
+   *
+   * @param curves  Curves to set. Non-null.
+   */
+  void setCurves(List<JsonCurve> curves)
+  {
+    assert curves != null : "curves cannot be null";
+
+    // TODO: Not thread safe. Need an atomic replacement for these two
+    curves_.clear();
+    curves_.addAll(curves);
+
+    hasCurveData_ = true;
   }
 
   /**

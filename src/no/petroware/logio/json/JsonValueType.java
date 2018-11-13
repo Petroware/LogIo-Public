@@ -5,7 +5,7 @@ import java.util.Date;
 /**
  * Represents the different data types defined in the JSON Well Log Format.
  *
- * @author <a href="mailto:info@petroware.no">Petroware AS</a>
+ * @author <a href="mailto:jacob.dreyer@petroware.no">Jacob Dreyer</a>
  */
 enum JsonValueType
 {
@@ -97,8 +97,25 @@ enum JsonValueType
       if (valueType.getValueType() == clazz)
         return valueType;
 
-    // Not found
-    return null;
+    if (clazz == Double.class)
+      return FLOAT;
+
+    if (clazz == Float.class)
+      return FLOAT;
+
+    if (clazz == Byte.class)
+      return INTEGER;
+
+    if (clazz == Short.class)
+      return INTEGER;
+
+    if (clazz == Integer.class)
+      return INTEGER;
+
+    if (clazz == Long.class)
+      return INTEGER;
+
+    return FLOAT;
   }
 
   /** {@inheritDoc} */

@@ -49,44 +49,44 @@ public enum JsonWellLogProperty
   /** Step if regular sampling. */
   STEP("step");
 
-  /** Tag used when the property is written to file. Non-null. */
-  private final String tag_;
+  /** Key used when the property is written to file. Non-null. */
+  private final String key_;
 
   /**
    * Create a well known well log property entry.
    *
-   * @param tag  Tag as when written to file. Non-null.
+   * @param key  Key as when written to file. Non-null.
    */
-  private JsonWellLogProperty(String tag)
+  private JsonWellLogProperty(String key)
   {
-    assert tag != null : "tag cannot be null";
-    tag_ = tag;
+    assert key != null : "key cannot be null";
+    key_ = key;
   }
 
   /**
-   * Return tag of this property.
+   * Return key of this property.
    *
-   * @return Tag of this property. Never null.
+   * @return Key of this property. Never null.
    */
-  public String getTag()
+  public String getKey()
   {
-    return tag_;
+    return key_;
   }
 
   /**
-   * Get property for the specified tag.
+   * Get property for the specified key.
    *
-   * @param tag  Tag to get property of. Non-null.
+   * @param key  Key to get property of. Non-null.
    * @return     The associated property, or null if not found.
-   * @throws IllegalArgumentException  If tag is null.
+   * @throws IllegalArgumentException  If key is null.
    */
-  public static JsonWellLogProperty getByTag(String tag)
+  public static JsonWellLogProperty getByKey(String key)
   {
-    if (tag == null)
-      throw new IllegalArgumentException("tag cannot be null");
+    if (key == null)
+      throw new IllegalArgumentException("key cannot be null");
 
     for (JsonWellLogProperty property : JsonWellLogProperty.values()) {
-      if (property.getTag().equals(tag))
+      if (property.getKey().equals(key))
         return property;
     }
 
@@ -99,6 +99,6 @@ public enum JsonWellLogProperty
   @Override
   public String toString()
   {
-    return tag_;
+    return key_;
   }
 }
