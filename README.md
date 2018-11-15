@@ -109,10 +109,10 @@ jsonFile.setField("Ekofisk");
 :
 
 // Create curves
-JsonCurve c1 = new JsonCurve("MD", "Measured depth", "length", "m", Class.double, 1);
+JsonCurve c1 = new JsonCurve("MD", "Measured depth", "length", "m", Double.class, 1);
 jsonFile.addCurve(c1);
 
-JsonCurve c2 = new JsonCurve("RES", "Resistivity", "electrical resistivity", "ohm.m", Class.double, 1);
+JsonCurve c2 = new JsonCurve("RES", "Resistivity", "electrical resistivity", "ohm.m", Double.class, 1);
 jsonFile.addCurve(c2);
 
 // Add curve data
