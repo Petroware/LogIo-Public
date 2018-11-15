@@ -641,6 +641,18 @@ public final class JsonFile
   }
 
   /**
+   * Return the <em>actual</em> start index of the log of this JSON file.
+   *
+   * @return  The actual start index. Null if the log has no values.
+   */
+  public Object getActualStartIndex()
+  {
+    JsonCurve indexCurve = !curves_.isEmpty() ? curves_.get(0) : null;
+    int nValues = indexCurve != null ? indexCurve.getNValues() : 0;
+    return nValues > 0 ? indexCurve.getValue(0) : null;
+  }
+
+  /**
    * Set start index of the log of this JSON file.
    *
    * @param startIndex  Start index to set. Null to unset. The type should
@@ -674,6 +686,18 @@ public final class JsonFile
   }
 
   /**
+   * Return the <em>actual</em> end index of the log of this JSON file.
+   *
+   * @return  The actual end index. Null if the log has no values.
+   */
+  public Object getActualEndIndex()
+  {
+    JsonCurve indexCurve = !curves_.isEmpty() ? curves_.get(0) : null;
+    int nValues = indexCurve != null ? indexCurve.getNValues() : 0;
+    return nValues > 0 ? indexCurve.getValue(nValues - 1) : null;
+  }
+
+  /**
    * Set end index of the log of this JSON file.
    *
    * @param endIndex  End index to set. Null to unset. The type should
@@ -700,6 +724,39 @@ public final class JsonFile
   public Double getStep()
   {
     return getPropertyAsDouble(JsonWellLogProperty.STEP.getKey());
+  }
+
+  /**
+   * Return the <em>actual</em> step of the index curve of this JSON file.
+   *
+   * @return  The actual step of the index curve.
+   *          Null if the JSON file has no data or the log set is irregular.
+   */
+  public Double getActualStep()
+  {
+    Double minStep = null;
+    Double maxStep = null;
+
+    if (!curves_.isEmpty()) {
+      JsonCurve indexCurve = curves_.get(0);
+      int nValues = 0;
+
+      double previousValue = nValues > 0 ? Util.getAsDouble(indexCurve.getValue(0)) : Double.NaN;
+      for (int i = 1; i < nValues; i++) {
+        double value = Util.getAsDouble(indexCurve.getValue(i));
+        double step = value - previousValue;
+        if (minStep == null || step < minStep)
+          minStep = step;
+        if (maxStep == null || step > maxStep)
+          maxStep = step;
+      }
+    }
+
+    if (minStep == null)
+      return null;
+
+    double averageStep = (minStep + maxStep) / 2.0;
+    return Math.abs(averageStep - minStep) < 0.001 ? averageStep : null;
   }
 
   /**

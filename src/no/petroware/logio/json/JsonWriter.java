@@ -1,6 +1,7 @@
 package no.petroware.logio.json;
 
 import java.io.BufferedWriter;
+import java.io.Closeable;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -27,6 +28,7 @@ import no.petroware.logio.util.Util;
  * @author <a href="mailto:info@petroware.no">Petroware AS</a>
  */
 public final class JsonWriter
+  implements Closeable
 {
   /** The physical disk file to write. */
   private final File file_;
@@ -45,6 +47,9 @@ public final class JsonWriter
 
   /** Current indentation according to pretty print mode. */
   private final Indentation indentation_;
+
+  /** The writer instance. */
+  private Writer writer_;
 
   /**
    * Class for holding a space indentation as used at the beginning
@@ -248,17 +253,16 @@ public final class JsonWriter
 
   /**
    * Write the array at the current position of the specified JSON parser
-   * to the given writer.
+   * to the destination.
    *
-   * @param writer       Writer to write to. Non-null.
    * @param jsonParser   The JSON parser holding the object to write. Non-null.
    * @param indentation  Current file indentation. Non-null.
    * @throws IOException  If the write operation fails for some reason.
    */
-  private void writeArray(Writer writer, JsonParser jsonParser, Indentation indentation)
+  private void writeArray(JsonParser jsonParser, Indentation indentation)
     throws IOException
   {
-    writer.write('[');
+    writer_.write('[');
 
     boolean isFirst = true;
 
@@ -270,7 +274,7 @@ public final class JsonWriter
       }
 
       else if (parseEvent == JsonParser.Event.START_OBJECT) {
-        writeObject(writer, jsonParser, indentation.push());
+        writeObject(jsonParser, indentation.push());
         isFirst = false;
       }
 
@@ -279,49 +283,49 @@ public final class JsonWriter
       }
 
       else if (parseEvent == JsonParser.Event.START_ARRAY) {
-        writeArray(writer, jsonParser, indentation.push());
+        writeArray(jsonParser, indentation.push());
       }
 
       else if (parseEvent == JsonParser.Event.END_ARRAY) {
-        writer.write("]");
-        writer.write(newline_);
+        writer_.write("]");
+        writer_.write(newline_);
         return;
       }
 
       else if (parseEvent == JsonParser.Event.VALUE_FALSE) {
         if (!isFirst)
-          writer.write(",\n");
-        writer.write("false");
+          writer_.write(",\n");
+        writer_.write("false");
         isFirst = false;
       }
 
       else if (parseEvent == JsonParser.Event.VALUE_TRUE) {
         if (!isFirst)
-          writer.write(",\n");
-        writer.write("true");
+          writer_.write(",\n");
+        writer_.write("true");
         isFirst = false;
       }
 
       else if (parseEvent == JsonParser.Event.VALUE_NULL) {
         if (!isFirst)
-          writer.write(",\n");
-        writer.write("null");
+          writer_.write(",\n");
+        writer_.write("null");
         isFirst = false;
       }
 
       else if (parseEvent == JsonParser.Event.VALUE_NUMBER) {
         if (!isFirst)
-          writer.write(",\n");
+          writer_.write(",\n");
         BigDecimal value = jsonParser.getBigDecimal();
-        writer.write(value.toString());
+        writer_.write(value.toString());
         isFirst = false;
       }
 
       else if (parseEvent == JsonParser.Event.VALUE_STRING) {
         if (!isFirst)
-          writer.write(",\n");
+          writer_.write(",\n");
         String value = jsonParser.getString();
-        writer.write(value);
+        writer_.write(value);
         isFirst = false;
       }
     }
@@ -329,23 +333,21 @@ public final class JsonWriter
 
   /**
    * Write the object at the current position of the specified JSON parser
-   * to the given writer.
+   * to the destination.
    *
-   * @param writer       Writer to write to. Non-null.
    * @param jsonParser   The JSON parser holding the object to write. Non-null.
    * @param indentation  Current file indentation. Non-null.
    * @throws IOException  If the write operation fails for some reason.
    */
-  private void writeObject(Writer writer, JsonParser jsonParser, Indentation indentation)
+  private void writeObject(JsonParser jsonParser, Indentation indentation)
     throws IOException
   {
-    assert writer != null : "writer cannot be null";
     assert jsonParser != null : "jsonParser cannot be null";
     assert indentation != null : "indentation cannot be null";
 
-    writer.write(spacing_);
-    writer.write("{");
-    writer.write(newline_);
+    writer_.write(spacing_);
+    writer_.write("{");
+    writer_.write(newline_);
 
     boolean isFirst = true;
 
@@ -356,32 +358,32 @@ public final class JsonWriter
         String key = jsonParser.getString();
 
         if (!isFirst) {
-          writer.write(",");
-          writer.write(newline_);
+          writer_.write(",");
+          writer_.write(newline_);
         }
 
-        writer.write(indentation.toString());
-        writer.write('\"');
-        writer.write(key);
-        writer.write('\"');
-        writer.write(":");
+        writer_.write(indentation.toString());
+        writer_.write('\"');
+        writer_.write(key);
+        writer_.write('\"');
+        writer_.write(":");
         isFirst = false;
       }
 
       else if (parseEvent == JsonParser.Event.START_OBJECT) {
-        writeObject(writer, jsonParser, indentation.push());
+        writeObject(jsonParser, indentation.push());
         isFirst = false;
       }
 
       else if (parseEvent == JsonParser.Event.END_OBJECT) {
-        writer.write(newline_);
-        writer.write(indentation.pop().toString());
-        writer.write('}');
+        writer_.write(newline_);
+        writer_.write(indentation.pop().toString());
+        writer_.write('}');
         return;
       }
 
       else if (parseEvent == JsonParser.Event.START_ARRAY) {
-        writeArray(writer, jsonParser, indentation.push());
+        writeArray(jsonParser, indentation.push());
       }
 
       else if (parseEvent == JsonParser.Event.END_ARRAY) {
@@ -389,242 +391,114 @@ public final class JsonWriter
       }
 
       else if (parseEvent == JsonParser.Event.VALUE_FALSE) {
-        writer.write(spacing_);
-        writer.write("false");
+        writer_.write(spacing_);
+        writer_.write("false");
       }
 
       else if (parseEvent == JsonParser.Event.VALUE_TRUE) {
-        writer.write(spacing_);
-        writer.write("true");
+        writer_.write(spacing_);
+        writer_.write("true");
       }
 
       else if (parseEvent == JsonParser.Event.VALUE_NULL) {
-        writer.write(spacing_);
-        writer.write("null");
+        writer_.write(spacing_);
+        writer_.write("null");
       }
 
       else if (parseEvent == JsonParser.Event.VALUE_NUMBER) {
         BigDecimal value = jsonParser.getBigDecimal();
-        writer.write(spacing_);
-        writer.write(value.toString());
+        writer_.write(spacing_);
+        writer_.write(value.toString());
       }
 
       else if (parseEvent == JsonParser.Event.VALUE_STRING) {
         String value = jsonParser.getString();
-        writer.write(spacing_);
-        writer.write('\"');
-        writer.write(value);
-        writer.write('\"');
+        writer_.write(spacing_);
+        writer_.write('\"');
+        writer_.write(value);
+        writer_.write('\"');
       }
     }
   }
 
   /**
-   * Write the specified list of JSON file instances to the disk
-   * file of this writer.
+   * Write the curve data of the specified JSON file to the stream
+   * of this writer.
    *
-   * @param jsonFiles  JSON files to write. Non-null.
-   * @throws IllegalArgumentException  If jsonFiles is null.
+   * @param jsonFile  JSON file to write curves of. Non-nul.
    * @throws IOException  If the write operation fails for some reason.
    */
-  public void write(List<JsonFile> jsonFiles)
+  private void writeData(JsonFile jsonFile)
     throws IOException
   {
-    OutputStream outputStream = file_ != null ? new FileOutputStream(file_) : outputStream_;
-    Writer writer = new BufferedWriter(new OutputStreamWriter(outputStream));
+    Indentation indentation = indentation_.push().push().push();
 
-    writer.write("{");
-    writer.write(newline_);
+    List<JsonCurve> curves = jsonFile.getCurves();
 
-    Indentation indentation = indentation_.push();
-
-    writer.write(indentation.toString());
-    writer.write("\"log\":");
-    writer.write(spacing_);
-    writer.write("{");
-    writer.write(newline_);
-
-    indentation = indentation.push();
-
-    for (JsonFile jsonFile : jsonFiles) {
-      //
-      // "metadata"
-      //
-      writer.write(indentation.toString());
-      writer.write("\"metadata\":");
-
-      JsonParser jsonParser = Json.createParserFactory(null).createParser(jsonFile.getMetadata());
-      jsonParser.next();
-      writeObject(writer, jsonParser, indentation.push());
-      jsonParser.close();
-
-      //
-      // "curves"
-      //
-      writer.write(newline_);
-      writer.write(indentation.toString());
-      writer.write("\"curves\": [");
-
-      boolean isFirst = true;
-
-      List<JsonCurve> curves = jsonFile.getCurves();
-
-      for (JsonCurve curve : curves) {
-
-        if (!isFirst)
-          writer.write(",");
-
-        writer.write(newline_);
-        indentation = indentation.push();
-        writer.write(indentation.toString());
-        writer.write("{");
-        writer.write(newline_);
-        indentation = indentation.push();
-
-        // Name
-        writer.write(indentation.toString());
-        writer.write("\"name\":");
-        writer.write(spacing_);
-        writer.write(getText(curve.getName()));
-        writer.write(",");
-        writer.write(newline_);
-
-        // Description
-        writer.write(indentation.toString());
-        writer.write("\"description\":");
-        writer.write(spacing_);
-        writer.write(getText(curve.getDescription()));
-        writer.write(",");
-        writer.write(newline_);
-
-        // Quantity
-        writer.write(indentation.toString());
-        writer.write("\"quantity\":");
-        writer.write(spacing_);
-        writer.write(getText(curve.getQuantity()));
-        writer.write(",");
-        writer.write(newline_);
-
-        // Unit
-        writer.write(indentation.toString());
-        writer.write("\"unit\":");
-        writer.write(spacing_);
-        writer.write(getText(curve.getUnit()));
-        writer.write(",");
-        writer.write(newline_);
-
-        // Value type
-        writer.write(indentation.toString());
-        writer.write("\"valueType\":");
-        writer.write(spacing_);
-        writer.write(getText(JsonValueType.get(curve.getValueType()).toString()));
-        writer.write(",");
-        writer.write(newline_);
-
-        // Dimension
-        writer.write(indentation.toString());
-        writer.write("\"dimensions\":");
-        writer.write(spacing_);
-        writer.write("" + curve.getNDimensions());
-        writer.write(newline_);
-
-        indentation = indentation.pop();
-        writer.write(indentation.toString());
-        writer.write("}");
-        indentation = indentation.pop();
-
-        isFirst = false;
-      }
-
-      writer.write(newline_);
-      writer.write(indentation.toString());
-      writer.write("]");
-
-      //
-      // "data"
-      //
-      writer.write(newline_);
-      writer.write(indentation.toString());
-      writer.write("\"data\": [");
-      writer.write(newline_);
-
-      // Create formatters for each curve
-      Map<JsonCurve,Formatter> formatters = new HashMap<>();
-      for (int curveNo = 0; curveNo < jsonFile.getNCurves(); curveNo++) {
-        JsonCurve curve = curves.get(curveNo);
-        formatters.put(curve, jsonFile.createFormatter(curve, curveNo == 0));
-      }
-
-      // Compute column width for each data column
-      Map<JsonCurve,Integer> columnWidths = new HashMap<>();
-      for (JsonCurve curve : curves)
-        columnWidths.put(curve, computeColumnWidth(curve, formatters.get(curve)));
-
-      for (int index = 0; index < jsonFile.getNValues(); index++) {
-        for (int curveNo = 0; curveNo < jsonFile.getNCurves(); curveNo++) {
-          JsonCurve curve = curves.get(curveNo);
-          Class<?> valueType = curve.getValueType();
-          int nDimensions = curve.getNDimensions();
-          int width = columnWidths.get(curve);
-          Formatter formatter = formatters.get(curve);
-
-          if (curveNo == 0) {
-            writer.write(indentation.push().toString());
-            writer.write("[");
-          }
-
-          if (nDimensions > 1) {
-            if (curveNo > 0)
-              writer.write(", ");
-
-            writer.write("[");
-            for (int dimension = 0; dimension < nDimensions; dimension ++) {
-              Object value = curve.getValue(dimension, index);
-              String text = getText(value, valueType, formatter, width);
-
-              if (dimension > 0)
-                writer.write(", ");
-              writer.write(text);
-            }
-            writer.write("]");
-          }
-          else {
-            Object value = curve.getValue(0, index);
-            String text = getText(value, valueType, formatter, width);
-
-            if (curveNo > 0)
-              writer.write(", ");
-            writer.write(text);
-          }
-        }
-
-        writer.write(']');
-        if (index < jsonFile.getNValues() - 1)
-          writer.write(',');
-        writer.write(newline_);
-      }
-
-      writer.write(indentation.toString());
-      writer.write("]");
-      writer.write(newline_);
+    // Create formatters for each curve
+    Map<JsonCurve,Formatter> formatters = new HashMap<>();
+    for (int curveNo = 0; curveNo < jsonFile.getNCurves(); curveNo++) {
+      JsonCurve curve = curves.get(curveNo);
+      formatters.put(curve, jsonFile.createFormatter(curve, curveNo == 0));
     }
 
-    indentation = indentation.pop();
+    // Compute column width for each data column
+    Map<JsonCurve,Integer> columnWidths = new HashMap<>();
+    for (JsonCurve curve : curves)
+      columnWidths.put(curve, computeColumnWidth(curve, formatters.get(curve)));
 
-    writer.write(indentation.toString());
-    writer.write("}");
-    writer.write(newline_);
-    writer.write("}");
-    writer.write(newline_);
+    for (int index = 0; index < jsonFile.getNValues(); index++) {
+      for (int curveNo = 0; curveNo < jsonFile.getNCurves(); curveNo++) {
+        JsonCurve curve = curves.get(curveNo);
+        Class<?> valueType = curve.getValueType();
+        int nDimensions = curve.getNDimensions();
+        int width = columnWidths.get(curve);
+        Formatter formatter = formatters.get(curve);
 
-    writer.close();
+        if (curveNo == 0) {
+          writer_.write(indentation.toString());
+          writer_.write("[");
+        }
+
+        if (nDimensions > 1) {
+          if (curveNo > 0)
+            writer_.write(", ");
+
+          writer_.write("[");
+          for (int dimension = 0; dimension < nDimensions; dimension ++) {
+            Object value = curve.getValue(dimension, index);
+            String text = getText(value, valueType, formatter, width);
+
+            if (dimension > 0)
+              writer_.write(", ");
+            writer_.write(text);
+          }
+          writer_.write("]");
+        }
+        else {
+          Object value = curve.getValue(0, index);
+          String text = getText(value, valueType, formatter, width);
+
+          if (curveNo > 0)
+            writer_.write(", ");
+          writer_.write(text);
+        }
+      }
+
+      writer_.write(']');
+      if (index < jsonFile.getNValues() - 1)
+        writer_.write(',');
+      writer_.write(newline_);
+    }
   }
 
   /**
-   * Write the specified JSON file instance to the disk file of
-   * this writer.
+   * Write the specified JSON file instances to this writer.
+   * Multiple files can be written in sequence to the same stream.
+   * Additional data can be appended to the last one by {@link #append}.
+   * When writing is done, close the writer with {@link #close}.
    *
-   * @param jsonFile  JSON file instance to write. Non-null.
+   * @param jsonFile  JSON file to write. Non-null.
    * @throws IllegalArgumentException  If jsonFile is null.
    * @throws IOException  If the write operation fails for some reason.
    */
@@ -634,9 +508,177 @@ public final class JsonWriter
     if (jsonFile == null)
       throw new IllegalArgumentException("jsonFile cannot be null");
 
-    List<JsonFile> jsonFiles = new ArrayList<>();
-    jsonFiles.add(jsonFile);
+    // Create the writer on first write operation
+    if (writer_ == null) {
+      OutputStream outputStream = file_ != null ? new FileOutputStream(file_) : outputStream_;
+      writer_ = new BufferedWriter(new OutputStreamWriter(outputStream));
 
-    write(jsonFiles);
+      writer_.write("{");
+      writer_.write(newline_);
+    }
+
+    Indentation indentation = indentation_.push();
+
+    writer_.write(indentation.toString());
+    writer_.write("\"log\":");
+    writer_.write(spacing_);
+    writer_.write("{");
+    writer_.write(newline_);
+
+    indentation = indentation.push();
+
+    //
+    // "metadata"
+    //
+    writer_.write(indentation.toString());
+    writer_.write("\"metadata\":");
+
+    JsonParser jsonParser = Json.createParserFactory(null).createParser(jsonFile.getMetadata());
+    jsonParser.next();
+    writeObject(jsonParser, indentation.push());
+    jsonParser.close();
+
+    writer_.write(',');
+
+    //
+    // "curves"
+    //
+    writer_.write(newline_);
+    writer_.write(indentation.toString());
+    writer_.write("\"curves\": [");
+
+    boolean isFirst = true;
+
+    List<JsonCurve> curves = jsonFile.getCurves();
+
+    for (JsonCurve curve : curves) {
+
+      if (!isFirst)
+        writer_.write(",");
+
+      writer_.write(newline_);
+      indentation = indentation.push();
+      writer_.write(indentation.toString());
+      writer_.write("{");
+      writer_.write(newline_);
+      indentation = indentation.push();
+
+      // Name
+      writer_.write(indentation.toString());
+      writer_.write("\"name\":");
+      writer_.write(spacing_);
+      writer_.write(getText(curve.getName()));
+      writer_.write(",");
+      writer_.write(newline_);
+
+      // Description
+      writer_.write(indentation.toString());
+      writer_.write("\"description\":");
+      writer_.write(spacing_);
+      writer_.write(getText(curve.getDescription()));
+      writer_.write(",");
+      writer_.write(newline_);
+
+      // Quantity
+      writer_.write(indentation.toString());
+      writer_.write("\"quantity\":");
+      writer_.write(spacing_);
+      writer_.write(getText(curve.getQuantity()));
+      writer_.write(",");
+      writer_.write(newline_);
+
+      // Unit
+      writer_.write(indentation.toString());
+      writer_.write("\"unit\":");
+      writer_.write(spacing_);
+      writer_.write(getText(curve.getUnit()));
+      writer_.write(",");
+      writer_.write(newline_);
+
+      // Value type
+      writer_.write(indentation.toString());
+      writer_.write("\"valueType\":");
+      writer_.write(spacing_);
+      writer_.write(getText(JsonValueType.get(curve.getValueType()).toString()));
+      writer_.write(",");
+      writer_.write(newline_);
+
+      // Dimension
+      writer_.write(indentation.toString());
+      writer_.write("\"dimensions\":");
+      writer_.write(spacing_);
+      writer_.write("" + curve.getNDimensions());
+      writer_.write(newline_);
+
+      indentation = indentation.pop();
+      writer_.write(indentation.toString());
+      writer_.write("}");
+      indentation = indentation.pop();
+
+      isFirst = false;
+    }
+
+    writer_.write(newline_);
+    writer_.write(indentation.toString());
+    writer_.write("]");
+
+    writer_.write(',');
+
+    //
+    // "data"
+    //
+    writer_.write(newline_);
+    writer_.write(indentation.toString());
+    writer_.write("\"data\": [");
+    writer_.write(newline_);
+
+    writeData(jsonFile);
+  }
+
+  /**
+   * Append the curve data of the specified JSON file to this
+   * writer.
+   * <p>
+   * This feature can be used to <em>stream</em> data to a JSON
+   * destination. By repeatedly clearing and populating the JSON
+   * file curves with new data there is no need for the client to
+   * keep the full volume in memory at any point in time.
+   * <p>
+   * <b>NOTE:</b> This method should be called after the JSON meta
+   * data has been written (@see #write), and the JSON file must be
+   * compatible with this.
+   * <p>
+   * When writing is done, close the stream with {@link #close}.
+   *
+   * @param jsonFile  JSON file of data append to stream. Non-null.
+   * @throws IllegalArgumentException  If jsonFile is null.
+   * @throws IOException  If the write operation fails for some reason.
+   */
+  public void append(JsonFile jsonFile)
+    throws IOException
+  {
+    writeData(jsonFile);
+  }
+
+  /**
+   * Append the final brackets to the JSON stream and
+   * close the writer.
+   */
+  public void close()
+    throws IOException
+  {
+    writer_.write(indentation_.push().push().toString());
+    writer_.write("]");
+    writer_.write(newline_);
+
+    writer_.write(indentation_.push().toString());
+    writer_.write("}");
+    writer_.write(newline_);
+
+    writer_.write("}");
+    writer_.write(newline_);
+
+    writer_.close();
+    writer_ = null;
   }
 }

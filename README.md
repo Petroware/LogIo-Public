@@ -128,9 +128,15 @@ c2.addValue(null);
 :
 c2.addValue(118.871);
 
+// Specify metadata for index
+jsonFile.setStartIndex(jsonFile.getActualStartIndex());
+jsonFile.setEndIndex(jsonFile.getActualEndIndex());
+jsonFile.setStep(jsonFile.getActualStep());
+
 // Write to file, human readable with 2 space indentation
 JsonWriter jsonWriter = new JsonWriter(new File("path/to/file.JSON", true, 2);
 jsonWriter.write(jsonFile);
+jsonWriter.close();
 ```
 
 This will produce the following file:

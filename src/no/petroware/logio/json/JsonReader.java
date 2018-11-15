@@ -531,35 +531,4 @@ public final class JsonReader
 
     return jsonFiles;
   }
-
-  /**
-   * Testing this class.
-   *
-   * @param arguments  Application arguments. Not used.
-   */
-  public static void main(String[] arguments)
-  {
-    File file = new File("C:/Users/main/logdata/json/log1.json");
-    JsonReader reader = new JsonReader(file);
-
-    try {
-      List<JsonFile> jsonFiles = reader.read(true, true, null);
-
-      for (JsonFile jsonFile : jsonFiles) {
-        System.out.println(jsonFile);
-
-        for (String key : jsonFile.getProperties()) {
-          System.out.println(key);
-          Object value = jsonFile.getProperty(key);
-          System.out.println("  " + value + " " + value.getClass());
-        }
-      }
-
-      JsonWriter writer = new JsonWriter(new File("C:/Users/main/logdata/json/log2.json"), true, 2);
-      writer.write(jsonFiles);
-    }
-    catch (Exception e) {
-      e.printStackTrace();
-    }
-  }
 }

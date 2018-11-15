@@ -735,6 +735,9 @@ public final class JsonValidator
   /**
    * Validate the specified stream according to the JSON Well Log Format
    * specification.
+   * <p>
+   * <b>NOTE:</b> The stream is owned by the client and should be closed
+   * by the client.
    *
    * @param stream  Stream to validate. Non-null.
    * @return        List of validation messages. Never null.
@@ -755,15 +758,14 @@ public final class JsonValidator
       jsonParser = Json.createParser(stream);
     }
     catch (JsonException exception) {
+      if (jsonParser != null)
+        jsonParser.close();
+
       if (exception.getCause() instanceof IOException)
         throw (IOException) exception.getCause();
 
       messages.add(new Message(Message.Level.SEVERE, null, "Unable to parse JSON."));
       return messages;
-    }
-    finally {
-      if (jsonParser != null)
-        jsonParser.close();
     }
 
     assert jsonParser != null : "jsonParser cannot be null here";
@@ -831,26 +833,5 @@ public final class JsonValidator
     stream.close();
 
     return messages;
-  }
-
-  /**
-   * Testing this class.
-   *
-   * @param arguments  Application arguments. Not used.
-   */
-  private static void main(String[] arguments)
-  {
-    File file = new File("C:/Users/main/logdata/json/log1.json");
-
-    System.out.println("Validate: " + file);
-
-    try {
-      List<JsonValidator.Message> messages = JsonValidator.getInstance().validate(file);
-      for (Message message : messages)
-        System.out.println(message);
-    }
-    catch (IOException exception) {
-      exception.printStackTrace();
-    }
   }
 }

@@ -137,7 +137,6 @@ public final class JsonCurve
   }
 
   /**
-  /**
    * Add a value to this curve.
    *
    * @param dimension  Dimension index. [0,nDimensions&gt;.
