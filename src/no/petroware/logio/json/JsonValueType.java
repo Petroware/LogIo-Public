@@ -5,7 +5,7 @@ import java.util.Date;
 /**
  * Represents the different data types defined in the JSON Well Log Format.
  *
- * @author <a href="mailto:jacob.dreyer@petroware.no">Jacob Dreyer</a>
+ * @author <a href="mailto:info@petroware.no">Petroware AS</a>
  */
 enum JsonValueType
 {

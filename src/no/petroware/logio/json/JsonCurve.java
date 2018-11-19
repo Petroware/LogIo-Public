@@ -148,7 +148,7 @@ public final class JsonCurve
     if (dimension < 0 || dimension >= nDimensions_)
       throw new IllegalArgumentException("Invalid dimension: " + dimension);
 
-    values_[dimension].add(value);
+    values_[dimension].add(Util.getAsType(value, valueType_));
   }
 
   /**

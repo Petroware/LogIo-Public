@@ -7,7 +7,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import javax.json.Json;
 import javax.json.JsonException;
@@ -135,20 +137,14 @@ public final class JsonValidator
     }
   }
 
-  /** File listing the valid Energistics quantities. */
-  private final static String QUANTITIES_FILE = "quantities.txt";
-
   /** File listing the valid Energistics units. */
   private final static String UNITS_FILE = "units.txt";
 
   /** The sole instance of this class. */
   private final static JsonValidator instance_ = new JsonValidator();
 
-  /** List of valid Energistics quantities. */
-  private final List<String> validQuantities_ = new ArrayList<>();
-
-  /** List of valid Energistics units. */
-  private final List<String> validUnits_ = new ArrayList<>();
+  /** List of valid Energistics units, mapped on quantity. */
+  private final Map<String,List<String>> validUnits_ = new HashMap<>();
 
   /**
    * Return the sole instance of this class.
@@ -165,35 +161,40 @@ public final class JsonValidator
    */
   private JsonValidator()
   {
-    loadProperties(QUANTITIES_FILE, validQuantities_);
-    loadProperties(UNITS_FILE, validUnits_);
+    loadValidUnits();
   }
 
   /**
-   * Load properties from the specified file.
-   *
-   * @param fileName    File name (of local package) to load from. Non-null.
-   * @param properties  Properties to populate. Non-null.
+   * Load valid quantity/unit combinations from file.
+   * Populate the validUnits_ member.
    */
-  private static void loadProperties(String fileName, List<String> properties)
+  private void loadValidUnits()
   {
-    assert fileName != null : "fileName cannot be null";
-    assert properties != null : "properties cannot be null";
-
     InputStream stream = null;
 
     try {
-      stream = JsonValidator.class.getResourceAsStream(fileName);
+      stream = JsonValidator.class.getResourceAsStream(UNITS_FILE);
       BufferedReader reader = new BufferedReader(new InputStreamReader(stream, "UTF-8"));
 
       String line;
 
       while ((line = reader.readLine()) != null) {
-        String token = line.trim();
-        if (token.startsWith("#"))
+        if (line.startsWith("#"))
           continue;
 
-        properties.add(token);
+        int commaPos = line.indexOf(',');
+        assert commaPos != -1 : "Invalid unit entry: " + line;
+
+        String quantity = line.substring(0, commaPos);
+        String unit = line.substring(commaPos + 1);
+
+        List<String> units = validUnits_.get(quantity);
+        if (units == null) {
+          units = new ArrayList<String>();
+          validUnits_.put(quantity, units);
+        }
+
+        units.add(unit);
       }
     }
     catch (IOException exception) {
@@ -497,26 +498,58 @@ public final class JsonValidator
       if (parseEvent == JsonParser.Event.END_OBJECT) {
         boolean isIndexCurve = jsonFile.getNCurves() == 0;
 
+        // Check that curve name is present
         if (curveName == null) {
           messages.add(new Message(Message.Level.SEVERE, jsonParser.getLocation(),
                                    "Curve name is missing for curve " + jsonFile.getNCurves() + "."));
           curveName = "curve"; // Use this to we can get on with the validation
         }
 
+        // Check that value type is present
         if (valueType == null) {
           messages.add(new Message(Message.Level.WARNING, jsonParser.getLocation(),
                                    "Curve valueType is missing. Float assumed."));
           valueType = Double.class;
         }
 
+        // Check that index curve has dimension 1
         if (isIndexCurve && nDimensions > 1) {
           throw new JsonParsingException("Invalid dimensions for index curve: " + nDimensions + ".",
                                          jsonParser.getLocation());
         }
 
+        // Check that index curve is numeric
         if (isIndexCurve && valueType == Boolean.class || valueType == String.class) {
           throw new JsonParsingException("Invalid valueType for index curve: " + valueType + ".",
                                          jsonParser.getLocation());
+        }
+
+        // Check that quantity is absent or legal
+        if (quantity != null && !quantity.isEmpty() && !validUnits_.containsKey(quantity)) {
+          messages.add(new Message(Message.Level.WARNING, jsonParser.getLocation(),
+                                   "Unrecognized quantity: " + quantity + "."));
+        }
+
+        // Check that unit is absent or legal according to quantity
+        if (unit != null && !unit.isEmpty()) {
+          boolean isLegal = false;
+          for (Map.Entry<String,List<String>> entry : validUnits_.entrySet()) {
+            String knownQuantity = entry.getKey();
+            List<String> validUnits = entry.getValue();
+
+            if (quantity != null && quantity.equals(knownQuantity) && validUnits.contains(unit) ||
+                quantity == null && validUnits.contains(unit))
+              isLegal = true;
+          }
+
+          if (!isLegal) {
+            if (quantity != null)
+              messages.add(new Message(Message.Level.WARNING, jsonParser.getLocation(),
+                                       "Unrecognized unit for: \"" + quantity + "\": " + unit + "."));
+            else
+              messages.add(new Message(Message.Level.WARNING, jsonParser.getLocation(),
+                                       "Unrecognized unit: \"" + unit + "."));
+          }
         }
 
         JsonCurve curve = new JsonCurve(curveName, description,
@@ -551,10 +584,6 @@ public final class JsonValidator
         else if (key.equals("quantity")) {
           parseEvent = jsonParser.next();
           quantity = parseEvent == JsonParser.Event.VALUE_STRING ? jsonParser.getString() : null;
-          if (quantity != null && !quantity.isEmpty() && !validQuantities_.contains(quantity)) {
-            messages.add(new Message(Message.Level.WARNING, jsonParser.getLocation(),
-                                     "Unrecognized quantity: \"" + quantity + "\"."));
-          }
         }
 
         //
@@ -563,10 +592,6 @@ public final class JsonValidator
         else if (key.equals("unit")) {
           parseEvent = jsonParser.next();
           unit = parseEvent == JsonParser.Event.VALUE_STRING ? jsonParser.getString() : null;
-          if (unit != null && !unit.isEmpty() && !validUnits_.contains(unit)) {
-            messages.add(new Message(Message.Level.WARNING, jsonParser.getLocation(),
-                                     "Unrecognized unit: \"" + unit + "\"."));
-          }
         }
 
         //

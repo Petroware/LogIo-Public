@@ -210,6 +210,61 @@ public final class JsonFile
   }
 
   /**
+   * Add a LAS type parameter to this JSON file.
+   * <p>
+   * This method is typically used when converting LAS files to
+   * JSON to make sure information is not lost. In general one
+   * should be careful adding properties like these as their
+   * <em>information value</em> is low. There is very limited
+   * possibility to further process information that is not tagged
+   * or dictionary controlled.
+   *
+   * @param lasParameter  Parameter to set. Non-null.
+   * @throws IllegalArgumentException  If lasParameter is null.
+   */
+  public void addLasParameter(JsonLasParameter lasParameter)
+  {
+    if (lasParameter == null)
+      throw new IllegalArgumentException("parameter cannot be null");
+
+    JsonObjectBuilder objectBuilder = Json.createObjectBuilder();
+    metadata_.forEach(objectBuilder::add);
+
+    Object value = lasParameter.getValue();
+
+    JsonObjectBuilder lasParameterBuilder = Json.createObjectBuilder();
+    if (value == null)
+      lasParameterBuilder.addNull("value");
+    else if (value instanceof Double)
+      lasParameterBuilder.add("value", (double) value);
+    else if (value instanceof Integer)
+      lasParameterBuilder.add("value", (int) value);
+    else if (value instanceof Date)
+      lasParameterBuilder.add("value", ISO8601DateParser.toString((Date) value));
+    else if (value instanceof Boolean)
+      lasParameterBuilder.add("value", (boolean) value);
+    else
+      lasParameterBuilder.add("value", value.toString());
+
+    String unit = lasParameter.getUnit();
+    if (unit != null)
+      lasParameterBuilder.add("unit", unit);
+    else
+      lasParameterBuilder.addNull("unit");
+
+    String description = lasParameter.getDescription();
+    if (description != null)
+      lasParameterBuilder.add("description", description);
+    else
+      lasParameterBuilder.addNull("description");
+
+
+    objectBuilder.add(lasParameter.getName(), lasParameterBuilder);
+
+    setMetadata(objectBuilder.build());
+  }
+
+  /**
    * Return all the metadata property keys of this JSON file.
    *
    * @return  All property keys of this JSON file. Never null.
@@ -349,22 +404,23 @@ public final class JsonFile
   }
 
   /**
-   * Return metadata property for the specified key as measured value.
+   * Return metadata property for the specified key as a LAS parameter.
    *
-   * @param key  Key of property to get. Non-null.
-   * @return     The associated value as a measured value. Null if not found, or
-   *             not compatible with the measured value type.
-   * @throws IllegalArgumentException  If key is null.
+   * @param name  Name of LAS parameter to get. Non-null.
+   * @return      The associated JSON object as a LAS parameter.
+   *              Null if not found, or not compatible with the LAS parameter
+   *              type.
+   * @throws IllegalArgumentException  If name is null.
    */
-  public JsonMeasuredValue getPropertyAsMeasuredValue(String key)
+  public JsonLasParameter getLasParameter(String name)
   {
-    if (key == null)
-      throw new IllegalArgumentException("key cannot be null");
+    if (name == null)
+      throw new IllegalArgumentException("name cannot be null");
 
     JsonParser jsonParser = Json.createParserFactory(null).createParser(metadata_);
     jsonParser.next(); // Proceed past the first START_OBJECT
 
-    Object object = JsonUtil.findObject(jsonParser, key);
+    Object object = JsonUtil.findObject(jsonParser, name);
     jsonParser.close();
 
     if (object instanceof JsonObject) {
@@ -372,14 +428,17 @@ public final class JsonFile
       jsonParser.next(); // Proceed past the first START_OBJECT
 
       Object valueObject = JsonUtil.findObject(jsonParser, "value");
-      Double value = valueObject instanceof BigDecimal ? ((BigDecimal) valueObject).doubleValue() : null;
+      Object value = valueObject;
 
-      Object unitObject = JsonUtil.findObject(jsonParser, "uom");
-      String unit = unitObject instanceof String ? unitObject.toString() : null;
+      Object unitObject = JsonUtil.findObject(jsonParser, "unit");
+      String unit = unitObject != null ? unitObject.toString() : null;
+
+      Object descriptionObject = JsonUtil.findObject(jsonParser, "description");
+      String description = descriptionObject != null ? descriptionObject.toString() : null;
 
       jsonParser.close();
 
-      return new JsonMeasuredValue(value, unit);
+      return new JsonLasParameter(name, value, unit, description);
     }
 
     return null;
@@ -734,29 +793,7 @@ public final class JsonFile
    */
   public Double getActualStep()
   {
-    Double minStep = null;
-    Double maxStep = null;
-
-    if (!curves_.isEmpty()) {
-      JsonCurve indexCurve = curves_.get(0);
-      int nValues = 0;
-
-      double previousValue = nValues > 0 ? Util.getAsDouble(indexCurve.getValue(0)) : Double.NaN;
-      for (int i = 1; i < nValues; i++) {
-        double value = Util.getAsDouble(indexCurve.getValue(i));
-        double step = value - previousValue;
-        if (minStep == null || step < minStep)
-          minStep = step;
-        if (maxStep == null || step > maxStep)
-          maxStep = step;
-      }
-    }
-
-    if (minStep == null)
-      return null;
-
-    double averageStep = (minStep + maxStep) / 2.0;
-    return Math.abs(averageStep - minStep) < 0.001 ? averageStep : null;
+    return JsonUtil.computeStep(this);
   }
 
   /**
@@ -944,7 +981,8 @@ public final class JsonFile
     s.append("-- JSON file\n");
 
     s.append("Metadata:\n");
-    s.append(metadata_ + "\n");
+    for (String property : getProperties())
+      System.out.println(property + ": " + getProperty(property));
 
     for (JsonCurve curve : curves_)
       s.append(curve + "\n");

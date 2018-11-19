@@ -13,7 +13,7 @@ import no.petroware.logio.util.Util;
 /**
  * A collection of utilities for the Log I/O JSON module.
  *
- * @author <a href="mailto:jacob.dreyer@petroware.no">Jacob Dreyer</a>
+ * @author <a href="mailto:info@petroware.no">Petroware AS</a>
  */
 final class JsonUtil
 {
@@ -227,7 +227,7 @@ final class JsonUtil
    * @return          The (minimum, maximum and average) step value of JSON file.
    * @throws IllegalArgumentException  If jsonFile is null.
    */
-  public static double[] findStep(JsonFile jsonFile)
+  static double[] findStep(JsonFile jsonFile)
   {
     if (jsonFile == null)
       throw new IllegalArgumentException("jsonFile");
@@ -280,7 +280,7 @@ final class JsonUtil
    * @return          The LAS file step value. 0.0 if irregular.
    * @throws IllegalArgumentException  If lasFile is null.
    */
-  public static double computeStep(JsonFile jsonFile)
+  public static Double computeStep(JsonFile jsonFile)
   {
     if (jsonFile == null)
       throw new IllegalArgumentException("jsonFile cannot be null");
@@ -299,6 +299,6 @@ final class JsonUtil
     // we might consider adjusting it further, probably as high as 0.01 would be OK.
     boolean isEqual = d <= Math.abs(averageStep) * 0.005;
 
-    return isEqual ? averageStep : 0.0;
+    return isEqual ? averageStep : null;
   }
 }

@@ -15,7 +15,6 @@ import javax.json.JsonObject;
 import javax.json.JsonObjectBuilder;
 import javax.json.stream.JsonParser;
 
-import no.petroware.logio.common.Statistics;
 import no.petroware.logio.util.Util;
 
 /**
@@ -114,9 +113,21 @@ public final class JsonReader
       return 0.0;
 
     boolean isFileNameMatching = file.getName().toLowerCase(Locale.US).endsWith(".json");
-    boolean isContentMatching;
 
-    return isFileNameMatching ? 0.9 : 0.3;
+    String s = new String(content);
+
+    if (content != null) {
+      if (!s.contains("\"log\""))
+        return 0.0;
+
+      if (s.contains("\"metadata\""))
+        return 0.95;
+
+      if (s.contains("\"curves\""))
+        return 0.95;
+    }
+
+    return isFileNameMatching ? 0.75 : 0.2;
   }
 
   /**
@@ -212,10 +223,9 @@ public final class JsonReader
         JsonCurve curve = jsonFile.getCurves().get(curveNo);
         Class<?> valueType = curve.getValueType();
         nDimensions = curve.getNDimensions();
-        Statistics statistics = curve.getStatistics();
 
         if (shouldCaptureStatistics)
-          statistics.push(Util.getAsDouble(value));
+          curve.getStatistics().push(Util.getAsDouble(value));
 
         if (shouldReadBulkData)
           curve.addValue(dimension, Util.getAsType(value, valueType));
@@ -530,5 +540,31 @@ public final class JsonReader
       inputStream.close();
 
     return jsonFiles;
+  }
+
+  /**
+   * Testing this class.
+   *
+   * @param arguments  Application arguments. Not used.
+   */
+  private static void main(String[] arguments)
+  {
+    File file = new File("C:/Users/main/logdata/json/log1.json");
+    JsonReader reader = new JsonReader(file);
+
+    try {
+      System.out.println("Read");
+      List<JsonFile> jsonFiles = reader.read(true, true, null);
+      System.out.println("Done");
+
+      JsonFile jsonFile = jsonFiles.get(0);
+      System.out.println(jsonFile);
+
+      JsonLasParameter lasParameter = jsonFile.getLasParameter("lasparam");
+      System.out.println(lasParameter);
+    }
+    catch (Exception e) {
+      e.printStackTrace();
+    }
   }
 }

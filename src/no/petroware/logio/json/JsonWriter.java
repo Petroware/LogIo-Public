@@ -1,6 +1,7 @@
 package no.petroware.logio.json;
 
 import java.io.BufferedWriter;
+import java.io.ByteArrayOutputStream;
 import java.io.Closeable;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -50,6 +51,9 @@ public final class JsonWriter
 
   /** The writer instance. */
   private Writer writer_;
+
+  /** Indicate if the last written JSON file contains data or not. */
+  private boolean hasData_;
 
   /**
    * Class for holding a space indentation as used at the beginning
@@ -168,7 +172,7 @@ public final class JsonWriter
    * curve data.
    *
    * @param curve      Curve to compute column width of. Non-null.
-   * @param formatter  Curve data formatter. Non-null.
+   * @param formatter  Curve data formatter. Null if N/A for the specified curve.
    * @return Width of widest element of the curve. [0,&gt;.
    */
   private static int computeColumnWidth(JsonCurve curve, Formatter formatter)
@@ -226,18 +230,21 @@ public final class JsonWriter
    *
    * @param value      Curve value to get as text. May be null, in case "null" is returned.
    * @param valueType  Java value type of the curve of the value. Non-null.
-   * @param formatter  Curve formatter. Specified for floating point values only.
-   * @param width      Total with set aside for the values of this column.
+   * @param formatter  Curve formatter. Specified for floating point values only, null otherwise,
+   * @param width      Total with set aside for the values of this column. [0,&gt;.
    * @return           The JSON token to be written to file. Never null.
    */
   private static String getText(Object value, Class<?> valueType, Formatter formatter, int width)
   {
+    assert valueType != null : "valueType cannot be null";
+    assert width >= 0 : "Invalid width: " + width;
+
     String text;
 
     if (value == null)
       text = "null";
     else if (valueType == Date.class)
-      text = ISO8601DateParser.toString((Date) value);
+      text = '\"' + ISO8601DateParser.toString((Date) value) + '\"';
     else if (valueType == Boolean.class)
       text = value.toString();
     else if (formatter != null)
@@ -262,6 +269,9 @@ public final class JsonWriter
   private void writeArray(JsonParser jsonParser, Indentation indentation)
     throws IOException
   {
+    assert jsonParser != null : "jsonParser cannot be null";
+    assert indentation != null : "indentation cannot be null";
+
     writer_.write('[');
 
     boolean isFirst = true;
@@ -425,12 +435,14 @@ public final class JsonWriter
    * Write the curve data of the specified JSON file to the stream
    * of this writer.
    *
-   * @param jsonFile  JSON file to write curves of. Non-nul.
+   * @param jsonFile  JSON file to write curves of. Non-null.
    * @throws IOException  If the write operation fails for some reason.
    */
   private void writeData(JsonFile jsonFile)
     throws IOException
   {
+    assert jsonFile != null : "jsonFile cannot be null";
+
     Indentation indentation = indentation_.push().push().push();
 
     List<JsonCurve> curves = jsonFile.getCurves();
@@ -486,9 +498,10 @@ public final class JsonWriter
       }
 
       writer_.write(']');
-      if (index < jsonFile.getNValues() - 1)
+      if (index < jsonFile.getNValues() - 1) {
         writer_.write(',');
-      writer_.write(newline_);
+        writer_.write(newline_);
+      }
     }
   }
 
@@ -508,12 +521,25 @@ public final class JsonWriter
     if (jsonFile == null)
       throw new IllegalArgumentException("jsonFile cannot be null");
 
+    boolean isFirstLog = writer_ == null;
+
     // Create the writer on first write operation
-    if (writer_ == null) {
+    if (isFirstLog) {
       OutputStream outputStream = file_ != null ? new FileOutputStream(file_) : outputStream_;
       writer_ = new BufferedWriter(new OutputStreamWriter(outputStream));
-
       writer_.write("{");
+      writer_.write(newline_);
+    }
+
+    // If this is an additional log, close the previous and make ready for a new
+    else {
+      writer_.write(newline_);
+      writer_.write(indentation_.push().push().toString());
+      writer_.write("]");
+      writer_.write(newline_);
+
+      writer_.write(indentation_.push().toString());
+      writer_.write("},");
       writer_.write(newline_);
     }
 
@@ -547,13 +573,13 @@ public final class JsonWriter
     writer_.write(indentation.toString());
     writer_.write("\"curves\": [");
 
-    boolean isFirst = true;
+    boolean isFirstCurve = true;
 
     List<JsonCurve> curves = jsonFile.getCurves();
 
     for (JsonCurve curve : curves) {
 
-      if (!isFirst)
+      if (!isFirstCurve)
         writer_.write(",");
 
       writer_.write(newline_);
@@ -615,7 +641,7 @@ public final class JsonWriter
       writer_.write("}");
       indentation = indentation.pop();
 
-      isFirst = false;
+      isFirstCurve = false;
     }
 
     writer_.write(newline_);
@@ -633,6 +659,8 @@ public final class JsonWriter
     writer_.write(newline_);
 
     writeData(jsonFile);
+
+    hasData_ = jsonFile.getNValues() > 0;
   }
 
   /**
@@ -652,33 +680,173 @@ public final class JsonWriter
    *
    * @param jsonFile  JSON file of data append to stream. Non-null.
    * @throws IllegalArgumentException  If jsonFile is null.
+   * @throws IllegalStateException     If the writer is not open for writing.
    * @throws IOException  If the write operation fails for some reason.
    */
   public void append(JsonFile jsonFile)
     throws IOException
   {
+    if (jsonFile == null)
+      throw new IllegalArgumentException("jsonFile cannot be null");
+
+    if (writer_ == null)
+      throw new IllegalStateException("Writer is not open");
+
+    if (hasData_) {
+      writer_.write(",");
+      writer_.write(newline_);
+    }
+
+    writer_.write(indentation_.toString());
     writeData(jsonFile);
+
+    if (!hasData_ && jsonFile.getNValues() > 0)
+      hasData_ = true;
   }
 
   /**
    * Append the final brackets to the JSON stream and
    * close the writer.
    */
+  @Override
   public void close()
     throws IOException
   {
+    // Nothing to do if the writer was never opened
+    if (writer_ == null)
+      return;
+
+    // Complete the data array
+    writer_.write(newline_);
     writer_.write(indentation_.push().push().toString());
     writer_.write("]");
     writer_.write(newline_);
 
+    // Complete the log object
     writer_.write(indentation_.push().toString());
     writer_.write("}");
     writer_.write(newline_);
 
+    // Complete the JSON object
     writer_.write("}");
     writer_.write(newline_);
 
     writer_.close();
     writer_ = null;
+  }
+
+  /**
+   * Convenience method for writing the content of the specified JSON
+   * files to a string.
+   *
+   * @param jsonFiles    JSON files to write. Non-null.
+   * @param isPretty     True to write in human readable pretty format, false
+   *                     to write as dense as possible.
+   * @param indentation  The white space indentation used in pretty print mode. [0,&gt;.
+   *                     If isPretty is false, this setting has no effect.
+   * @return             The requested string. Never null.
+   * @throws IllegalArgumentException  If jsonFiles is null or indentation is out of bounds.
+   * @throws IOException               If the write operation fails for some reason.
+   */
+  public static String toString(List<JsonFile> jsonFiles, boolean isPretty, int indentation)
+    throws IOException
+  {
+    if (jsonFiles == null)
+      throw new IllegalArgumentException("jsonFiles cannot be null");
+
+    if (indentation < 0)
+      throw new IllegalArgumentException("invalid indentation: " + indentation);
+
+    ByteArrayOutputStream stringStream = new ByteArrayOutputStream();
+    JsonWriter writer = new JsonWriter(stringStream, isPretty, indentation);
+
+    for (JsonFile jsonFile : jsonFiles)
+      writer.write(jsonFile);
+    writer.close();
+
+    return new String(stringStream.toByteArray(), "UTF-8");
+  }
+
+  /**
+   * Convenience method for writing the content of the specified JSON
+   * file to a string.
+   *
+   * @param jsonFile     JSON files to write. Non-null.
+   * @param isPretty     True to write in human readable pretty format, false
+   *                     to write as dense as possible.
+   * @param indentation  The white space indentation used in pretty print mode. [0,&gt;.
+   *                     If isPretty is false, this setting has no effect.
+   * @return             The requested string. Never null.
+   * @throws IllegalArgumentException  If jsonFile is null or indentation is out of bounds.
+   * @throws IOException               If the write operation fails for some reason.
+   */
+  public static String toString(JsonFile jsonFile, boolean isPretty, int indentation)
+    throws IOException
+  {
+    if (jsonFile == null)
+      throw new IllegalArgumentException("jsonFile cannot be null");
+
+    if (indentation < 0)
+      throw new IllegalArgumentException("invalid indentation: " + indentation);
+
+    List<JsonFile> jsonFiles = new ArrayList<>();
+    jsonFiles.add(jsonFile);
+    return toString(jsonFiles, isPretty, indentation);
+  }
+
+  /**
+   * Testing this class.
+   *
+   * @param arguments  Application arguments. Not used.
+   */
+  private static void main(String[] arguments)
+  {
+    JsonFile jsonFile = new JsonFile();
+
+    jsonFile.setName("EcoScope Data");
+    jsonFile.setWell("35/12-6S");
+    jsonFile.setField("Ekofisk");
+    jsonFile.addLasParameter(new JsonLasParameter("LAS", null, null, null));
+
+    for (int curveNo = 0; curveNo < 5; curveNo++) {
+      JsonCurve c = new JsonCurve("curve" + curveNo, "Curve", null, null, Double.class, 1);
+      jsonFile.addCurve(c);
+    }
+
+    try {
+      File file = new File("C:/Users/main/tull.json");
+
+      JsonWriter writer = new JsonWriter(file, true, 2);
+      writer.write(jsonFile);
+
+      for (int i = 0; i < 10; i++) {
+        jsonFile.clearCurves();
+
+        for (JsonCurve curve : jsonFile.getCurves())
+          curve.addValue(i);
+
+        writer.append(jsonFile);
+      }
+
+      writer.close();
+
+      JsonReader reader = new JsonReader(file);
+      System.out.println("Reading");
+      long time0 = System.currentTimeMillis();
+
+
+      List<JsonFile> jsonFiles = reader.read(true, false, null);
+
+      long time = System.currentTimeMillis() - time0;
+      double speed = Math.round(file.length() / time / 1000.0); // MB/s
+      System.out.println("Done in " + time + "ms." + "( " + speed + "MB/s)");
+
+      jsonFile = jsonFiles.get(0);
+      JsonLasParameter lasParameter = jsonFile.getLasParameter("LAS");
+      System.out.println(lasParameter);
+    }
+    catch (IOException exception) {
+      exception.printStackTrace();
+    }
   }
 }
