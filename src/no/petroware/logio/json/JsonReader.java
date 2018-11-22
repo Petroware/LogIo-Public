@@ -19,7 +19,7 @@ import no.petroware.logio.util.Util;
 
 /**
  * Class for reading well logs in the JSON format.
- * * <p>
+ * <p>
  * Typical usage:
  *
  * <pre>
@@ -114,9 +114,9 @@ public final class JsonReader
 
     boolean isFileNameMatching = file.getName().toLowerCase(Locale.US).endsWith(".json");
 
-    String s = new String(content);
-
     if (content != null) {
+      String s = new String(content);
+
       if (!s.contains("\"log\""))
         return 0.0;
 
@@ -540,31 +540,5 @@ public final class JsonReader
       inputStream.close();
 
     return jsonFiles;
-  }
-
-  /**
-   * Testing this class.
-   *
-   * @param arguments  Application arguments. Not used.
-   */
-  private static void main(String[] arguments)
-  {
-    File file = new File("C:/Users/main/logdata/json/log1.json");
-    JsonReader reader = new JsonReader(file);
-
-    try {
-      System.out.println("Read");
-      List<JsonFile> jsonFiles = reader.read(true, true, null);
-      System.out.println("Done");
-
-      JsonFile jsonFile = jsonFiles.get(0);
-      System.out.println(jsonFile);
-
-      JsonLasParameter lasParameter = jsonFile.getLasParameter("lasparam");
-      System.out.println(lasParameter);
-    }
-    catch (Exception e) {
-      e.printStackTrace();
-    }
   }
 }

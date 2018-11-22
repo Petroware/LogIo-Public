@@ -690,7 +690,7 @@ public final class JsonValidator
     // Check which property we include that is not well known
     for (String actualProperty : actualProperties) {
       if (!wellKnownProperties.contains(actualProperty))
-        messages.add(new Message(Message.Level.WARNING, null, "Unrewcognized property \"" + actualProperty + "\"."));
+        messages.add(new Message(Message.Level.WARNING, null, "Unrecognized property \"" + actualProperty + "\"."));
     }
   }
 

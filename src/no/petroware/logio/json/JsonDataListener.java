@@ -2,11 +2,11 @@ package no.petroware.logio.json;
 
 /**
  * Provides a mechanism for the client to monitor and process data
- * <em>during</em> the JSON read operation.
+ * <em>during</em> a JSON read operation.
  * <p>
  * Convenient for handling JSON files that are larger than physical
  * memory. In this case the client should <em>clear</em> the JSON
- * file instance at each invocation:
+ * file instance at fixed intervals:
  *
  * <pre>
  *   class DataListener implements JsonDataListener

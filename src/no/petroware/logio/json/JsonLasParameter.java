@@ -16,8 +16,8 @@ import no.petroware.logio.util.Util;
  *    PDAT   .       MSL  : Permanent Datum
  * </pre>
  * <p>
- * Using the JsonLasParameter class for transition, these parameters
- * can convert into:
+ * Using the {@link JsonLasParameter} class for transition, the information
+ * can be represented in JSON as:
  * <pre>
  *   "SwIrr": {
  *     "value": 0.3000,
@@ -36,7 +36,7 @@ import no.petroware.logio.util.Util;
  *   }
  * </pre>
  * <p>
- * Note that the information value of such parameters are <em>low</em>.
+ * Note that the <em>informational value</em> of such parameters is low.
  * Some clients may understand the meaning of the names, but in general
  * this information is not fit for further processing.
  *
@@ -63,6 +63,7 @@ public final class JsonLasParameter
    * @param value        The parameter value. Null if absent.
    * @param unit         The value unit. Null if N/A, unitless or not known.
    * @param description  Parameter description. Null if none provided.
+   * @throws IllegalArgumentException  If name is null.
    */
   public JsonLasParameter(String name, Object value, String unit, String description)
   {
@@ -119,7 +120,7 @@ public final class JsonLasParameter
   /**
    * Return the parameter value as a double precision decimal number.
    *
-   * @return  Parameter value as a double. Null if absent.
+   * @return  Parameter value as a string. Null if absent.
    */
   public String getValueAsString()
   {
@@ -129,7 +130,8 @@ public final class JsonLasParameter
   /**
    * Return the parameter value as a double precision decimal number.
    *
-   * @return  Parameter value as a double. Null if absent.
+   * @return  Parameter value as a date.
+   *          Null if absent or the value is not compatible with the date type.
    */
   public Date getValueAsDate()
   {

@@ -1,6 +1,5 @@
 package no.petroware.logio.json;
 
-import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
@@ -8,6 +7,7 @@ import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 import javax.json.Json;
+import javax.json.JsonArrayBuilder;
 import javax.json.JsonObject;
 import javax.json.JsonObjectBuilder;
 import javax.json.stream.JsonParser;
@@ -219,13 +219,13 @@ public final class JsonFile
    * possibility to further process information that is not tagged
    * or dictionary controlled.
    *
-   * @param lasParameter  Parameter to set. Non-null.
+   * @param lasParameter  Parameter to add. Non-null.
    * @throws IllegalArgumentException  If lasParameter is null.
    */
   public void addLasParameter(JsonLasParameter lasParameter)
   {
     if (lasParameter == null)
-      throw new IllegalArgumentException("parameter cannot be null");
+      throw new IllegalArgumentException("lasParameter cannot be null");
 
     JsonObjectBuilder objectBuilder = Json.createObjectBuilder();
     metadata_.forEach(objectBuilder::add);
@@ -262,6 +262,118 @@ public final class JsonFile
     objectBuilder.add(lasParameter.getName(), lasParameterBuilder);
 
     setMetadata(objectBuilder.build());
+  }
+
+  /**
+   * Return metadata property for the specified key as a <em>LAS parameter</em>.
+   * <p>
+   * This feature is typically used when a JSON file has been converted from LAS.
+   * See {@link JsonLasParameter} for more information.
+   *
+   * @param name  Name of LAS parameter to get. Non-null.
+   * @return      The associated JSON object as a LAS parameter.
+   *              Null if not found, or not compatible with the LAS parameter
+   *              type.
+   * @throws IllegalArgumentException  If name is null.
+   */
+  public JsonLasParameter getLasParameter(String name)
+  {
+    if (name == null)
+      throw new IllegalArgumentException("name cannot be null");
+
+    JsonParser jsonParser = Json.createParserFactory(null).createParser(metadata_);
+    jsonParser.next(); // Proceed past the first START_OBJECT
+
+    Object object = JsonUtil.findObject(jsonParser, name);
+    jsonParser.close();
+
+    if (object instanceof JsonObject) {
+      jsonParser = Json.createParserFactory(null).createParser((JsonObject) object);
+      jsonParser.next(); // Proceed past the first START_OBJECT
+
+      Object valueObject = JsonUtil.findObject(jsonParser, "value");
+      Object value = valueObject;
+
+      Object unitObject = JsonUtil.findObject(jsonParser, "unit");
+      String unit = unitObject != null ? unitObject.toString() : null;
+
+      Object descriptionObject = JsonUtil.findObject(jsonParser, "description");
+      String description = descriptionObject != null ? descriptionObject.toString() : null;
+
+      jsonParser.close();
+
+      return new JsonLasParameter(name, value, unit, description);
+    }
+
+    return null;
+  }
+
+  /**
+   * Add a DLIS type set to this JSON file.
+   * <p>
+   * This method is typically used when converting DLIS files to
+   * JSON to make sure information is not lost. In general one
+   * should be careful adding properties like these as their
+   * <em>information value</em> is low. There is very limited
+   * possibility to further process information that is not tagged
+   * or dictionary controlled.
+   *
+   * @param dlisSet  Set to add. Non-null.
+   * @throws IllegalArgumentException  If dlisSet is null.
+   */
+  public void addDlisSet(JsonDlisSet dlisSet)
+  {
+    if (dlisSet == null)
+      throw new IllegalArgumentException("dlisSet cannot be null");
+
+    // Root builder
+    JsonObjectBuilder objectBuilder = Json.createObjectBuilder();
+    metadata_.forEach(objectBuilder::add);
+
+    // Attribute builder
+    JsonArrayBuilder attributeBuilder = Json.createArrayBuilder();
+    for (String attributeName : dlisSet.getAttributes())
+      attributeBuilder.add(attributeName);
+
+    /*
+    // Objects builder
+    JsonArrayBuilder objectsBuilder = Json.createArrayBuilder();
+    for (String objectName : dlisSet.getObjects()) {
+      JsonArrayBuilder objectBuilder = Json.createArrayBuilder();
+
+
+    }
+    */
+
+
+    JsonObjectBuilder dlisSetBuilder = Json.createObjectBuilder();
+    dlisSetBuilder.add("attributes", attributeBuilder);
+
+    objectBuilder.add(dlisSet.getName(), dlisSetBuilder);
+
+    setMetadata(objectBuilder.build());
+  }
+
+  /**
+   * Return metadata property for the specified key as a <em>DLIS set</em>.
+   * <p>
+   * This feature is typically used when a JSON file has been converted from DLIS.
+   * See {@link JsonDlisSet} for more information.
+   *
+   * @param name  Name of LAS parameter to get. Non-null.
+   * @return      The associated JSON object as a LAS parameter.
+   *              Null if not found, or not compatible with the LAS parameter
+   *              type.
+   * @throws IllegalArgumentException  If name is null.
+   */
+  public JsonDlisSet getDlisSet(String name)
+  {
+    if (name == null)
+      throw new IllegalArgumentException("name cannot be null");
+
+    // TODO
+
+    return null;
   }
 
   /**
@@ -401,47 +513,6 @@ public final class JsonFile
     jsonParser.close();
 
     return (Date) Util.getAsType(object, Date.class);
-  }
-
-  /**
-   * Return metadata property for the specified key as a LAS parameter.
-   *
-   * @param name  Name of LAS parameter to get. Non-null.
-   * @return      The associated JSON object as a LAS parameter.
-   *              Null if not found, or not compatible with the LAS parameter
-   *              type.
-   * @throws IllegalArgumentException  If name is null.
-   */
-  public JsonLasParameter getLasParameter(String name)
-  {
-    if (name == null)
-      throw new IllegalArgumentException("name cannot be null");
-
-    JsonParser jsonParser = Json.createParserFactory(null).createParser(metadata_);
-    jsonParser.next(); // Proceed past the first START_OBJECT
-
-    Object object = JsonUtil.findObject(jsonParser, name);
-    jsonParser.close();
-
-    if (object instanceof JsonObject) {
-      jsonParser = Json.createParserFactory(null).createParser((JsonObject) object);
-      jsonParser.next(); // Proceed past the first START_OBJECT
-
-      Object valueObject = JsonUtil.findObject(jsonParser, "value");
-      Object value = valueObject;
-
-      Object unitObject = JsonUtil.findObject(jsonParser, "unit");
-      String unit = unitObject != null ? unitObject.toString() : null;
-
-      Object descriptionObject = JsonUtil.findObject(jsonParser, "description");
-      String description = descriptionObject != null ? descriptionObject.toString() : null;
-
-      jsonParser.close();
-
-      return new JsonLasParameter(name, value, unit, description);
-    }
-
-    return null;
   }
 
   /**

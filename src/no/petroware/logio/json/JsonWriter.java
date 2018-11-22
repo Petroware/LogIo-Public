@@ -25,6 +25,22 @@ import no.petroware.logio.util.Util;
 
 /**
  * Class for writing JSON files to disk.
+ * <p>
+ * Typical usage:
+ *
+ * <pre>
+ *   JsonFile jsonFile = new JsonFile();
+ *   :
+ *
+ *   // Writ as human readable with indentation = 2
+ *   JsonWriter writer = new JsonWriter(new File("path/to/file"), true, 2);
+ *   writer.write(jsonFile);
+ *   writer.close();
+ * </pre>
+ *
+ * If there is to much data to keep in memory, it is possible to write in a
+ * <em>streaming</em> manner by adding curve data and appending the output
+ * file alternately, see {@link #append}.
  *
  * @author <a href="mailto:info@petroware.no">Petroware AS</a>
  */
@@ -272,7 +288,7 @@ public final class JsonWriter
     assert jsonParser != null : "jsonParser cannot be null";
     assert indentation != null : "indentation cannot be null";
 
-    writer_.write('[');
+    writer_.write(" [\n");
 
     boolean isFirst = true;
 
@@ -298,13 +314,13 @@ public final class JsonWriter
 
       else if (parseEvent == JsonParser.Event.END_ARRAY) {
         writer_.write("]");
-        writer_.write(newline_);
         return;
       }
 
       else if (parseEvent == JsonParser.Event.VALUE_FALSE) {
         if (!isFirst)
           writer_.write(",\n");
+        writer_.write(indentation.toString());
         writer_.write("false");
         isFirst = false;
       }
@@ -312,6 +328,7 @@ public final class JsonWriter
       else if (parseEvent == JsonParser.Event.VALUE_TRUE) {
         if (!isFirst)
           writer_.write(",\n");
+        writer_.write(indentation.toString());
         writer_.write("true");
         isFirst = false;
       }
@@ -319,6 +336,7 @@ public final class JsonWriter
       else if (parseEvent == JsonParser.Event.VALUE_NULL) {
         if (!isFirst)
           writer_.write(",\n");
+        writer_.write(indentation.toString());
         writer_.write("null");
         isFirst = false;
       }
@@ -326,6 +344,7 @@ public final class JsonWriter
       else if (parseEvent == JsonParser.Event.VALUE_NUMBER) {
         if (!isFirst)
           writer_.write(",\n");
+        writer_.write(indentation.toString());
         BigDecimal value = jsonParser.getBigDecimal();
         writer_.write(value.toString());
         isFirst = false;
@@ -334,6 +353,7 @@ public final class JsonWriter
       else if (parseEvent == JsonParser.Event.VALUE_STRING) {
         if (!isFirst)
           writer_.write(",\n");
+        writer_.write(indentation.toString());
         String value = jsonParser.getString();
         writer_.write(value);
         isFirst = false;
@@ -673,7 +693,7 @@ public final class JsonWriter
    * keep the full volume in memory at any point in time.
    * <p>
    * <b>NOTE:</b> This method should be called after the JSON meta
-   * data has been written (@see #write), and the JSON file must be
+   * data has been written (see {@link #write}), and the JSON file must be
    * compatible with this.
    * <p>
    * When writing is done, close the stream with {@link #close}.
@@ -792,61 +812,5 @@ public final class JsonWriter
     List<JsonFile> jsonFiles = new ArrayList<>();
     jsonFiles.add(jsonFile);
     return toString(jsonFiles, isPretty, indentation);
-  }
-
-  /**
-   * Testing this class.
-   *
-   * @param arguments  Application arguments. Not used.
-   */
-  private static void main(String[] arguments)
-  {
-    JsonFile jsonFile = new JsonFile();
-
-    jsonFile.setName("EcoScope Data");
-    jsonFile.setWell("35/12-6S");
-    jsonFile.setField("Ekofisk");
-    jsonFile.addLasParameter(new JsonLasParameter("LAS", null, null, null));
-
-    for (int curveNo = 0; curveNo < 5; curveNo++) {
-      JsonCurve c = new JsonCurve("curve" + curveNo, "Curve", null, null, Double.class, 1);
-      jsonFile.addCurve(c);
-    }
-
-    try {
-      File file = new File("C:/Users/main/tull.json");
-
-      JsonWriter writer = new JsonWriter(file, true, 2);
-      writer.write(jsonFile);
-
-      for (int i = 0; i < 10; i++) {
-        jsonFile.clearCurves();
-
-        for (JsonCurve curve : jsonFile.getCurves())
-          curve.addValue(i);
-
-        writer.append(jsonFile);
-      }
-
-      writer.close();
-
-      JsonReader reader = new JsonReader(file);
-      System.out.println("Reading");
-      long time0 = System.currentTimeMillis();
-
-
-      List<JsonFile> jsonFiles = reader.read(true, false, null);
-
-      long time = System.currentTimeMillis() - time0;
-      double speed = Math.round(file.length() / time / 1000.0); // MB/s
-      System.out.println("Done in " + time + "ms." + "( " + speed + "MB/s)");
-
-      jsonFile = jsonFiles.get(0);
-      JsonLasParameter lasParameter = jsonFile.getLasParameter("LAS");
-      System.out.println(lasParameter);
-    }
-    catch (IOException exception) {
-      exception.printStackTrace();
-    }
   }
 }
