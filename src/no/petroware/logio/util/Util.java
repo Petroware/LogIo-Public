@@ -328,7 +328,6 @@ public final class Util
         return ISO8601DateParser.parse(dateString);
       }
       catch (Exception exception) {
-        exception.printStackTrace();
         return null;
       }
     }
