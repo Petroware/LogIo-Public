@@ -2,16 +2,68 @@ package no.petroware.logio.util;
 
 import java.text.ParseException;
 import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.GregorianCalendar;
-import java.util.Locale;
 import java.util.TimeZone;
 
 /**
  * Date parser for the ISO 8601 format.
- * See <a href="http://www.w3.org/TR/xmlschema-2/#dateTime">
- * http://www.w3.org/TR/xmlschema-2/#dateTime</a>
+ * See <a href="https://en.wikipedia.org/wiki/ISO_8601">https://en.wikipedia.org/wiki/ISO_8601</a>
+ * <p>
+ * Java/SDK have several implementation of ISO8601 parsers, but neither
+ * comply to all aspects of the format so we do it properly here.
+ * <p>
+ * An ISO 8601 date/time representation has the following form:
+ * <pre>
+ *      &lt;date&gt;T&lt;time&gt;&lt;zone&gt;
+ * </pre>
+ * The 'T' separator between date and time is mandatory if time is present,
+ * but often a space is used instead. This is not allowed by ISO 8601, but
+ * we allow it here anyway.
+ * <p>
+ * &lt;date&gt; ha the following form (hyphens are optional):
+ * <pre>
+ *   2018-11-24    ; Normal form
+ *   2018-11       ; Year and month only, day = 01 implied
+ *   2018          ; Year only, January 1 implied
+ *   2018-W47      ; Week number. 1 day of week implied
+ *   2018-W47-6    ; Week number and day of week
+ *   2018-328      ; Ordinal date (day number of year)
+ *   20            ; Century only. January 1, 00 assumed
+ * </pre>
+ * <p>
+ * &lt;time&gt; (optional) has the following form (colons are optional,
+ * fraction delimiter can be dot or comma):
+ * <pre>
+ *                 ; Absent 00:00 implied
+ *   13:42:15      ; Normal form
+ *   13:42         ; Hour and minutes only. second 0 implied
+ *   13            ; Hour only. minute 0 and second 0 implied
+ *   13:42:15.5201 ; Fractional seconds
+ *   13:42.5201    ; Fractional minutes
+ *   13.5          ; Fractional hours
+ * </pre>
+ * <p>
+ * &lt;zone&gt; (optional) has the following form (colons are optional):
+ * <pre>
+ *                 ; Absent. Time is in "local" time
+ *   Z             ; UTC ("Zulu" time)
+ *   +hh:mm        ; Number of hours:munutes ahead (+) or behind (-) UTC
+ *   +hh           ; Number of hours ahead (+) or behind (-) UTC
+ * </pre>
+ * If time zone is not specified, "local" time is assumed. If "local" is to be
+ * interpreted as "here", we could use TimeZone.getDefault() (the time zone of
+ * the current JVM), but this will give different results if the parser is executed
+ * in a different time zone. It is better to interpret "local" as "don't know"
+ * and associate it with UTC (being as good as anything) and at least get consistent
+ * results wherever the class is used.
+ * <p>
+ * <b>NOTE:</b> The parser is <em>lenient</em> meaning that it may accept
+ * sensible input that not necessarily follow the ISO 8601 strictly.
+ * The class can therefore not be used to <em>validate</em> ISO 8601.
  *
  * @author <a href="mailto:info@petroware.no">Petroware AS</a>
  */
@@ -25,173 +77,233 @@ public final class ISO8601DateParser
     assert false : "This constructor should never be called";
   }
 
-	private static int getIndexOfSign(String str)
-  {
-		int index = str.indexOf('+');
-		return index != -1 ? index : str.indexOf('-');
-	}
-
-	private static Calendar parseHour(Calendar calendar, String hourString)
-  {
-		String basicFormatHour = hourString.replace(":", "");
-
-		int indexOfZ = basicFormatHour.indexOf('Z');
-		if (indexOfZ != -1) {
-			parseHourWithoutHandlingTimeZone(calendar, basicFormatHour.substring(0, indexOfZ));
-		}
-    else {
-			int indexOfSign = hourString.indexOf('+');
-      if (indexOfSign == -1)
-        indexOfSign = hourString.indexOf('-');
-
-      if (indexOfSign == -1) {
-				parseHourWithoutHandlingTimeZone(calendar, basicFormatHour);
-				calendar.setTimeZone(TimeZone.getDefault());
-			}
-      else {
-				parseHourWithoutHandlingTimeZone(calendar, basicFormatHour.substring(0, indexOfSign));
-				calendar.setTimeZone(TimeZone.getTimeZone("GMT" + basicFormatHour.substring(indexOfSign)));
-			}
-		}
-
-		return calendar;
-	}
-
-	private static void parseHourWithoutHandlingTimeZone(Calendar calendar, String basicFormatHour)
-  {
-		basicFormatHour = basicFormatHour.replace(',', '.');
-		int indexOfDot = basicFormatHour.indexOf('.');
-		double fractionalPart = 0;
-		if ( indexOfDot != -1 ){
-			fractionalPart = Double.parseDouble("0" + basicFormatHour.substring(indexOfDot));
-			basicFormatHour = basicFormatHour.substring(0, indexOfDot);
-		}
-
-		if ( basicFormatHour.length() >= 2 ){
-			calendar.set(Calendar.HOUR_OF_DAY, Integer.parseInt(basicFormatHour.substring(0, 2)));
-		}
-
-		if ( basicFormatHour.length() > 2 ){
-			calendar.set(Calendar.MINUTE, Integer.parseInt(basicFormatHour.substring(2, 4)));
-		} else {
-			fractionalPart *= 60;
-		}
-
-		if ( basicFormatHour.length() > 4 ){
-			calendar.set(Calendar.SECOND, Integer.parseInt(basicFormatHour.substring(4, 6)));
-		} else {
-			fractionalPart *= 60;
-		}
-
-		calendar.set(Calendar.MILLISECOND, (int) (fractionalPart * 1000));
-	}
-
-	private static Calendar buildCalendarWithDateOnly(String dateString, String originalDate)
+  /**
+   * Parse the specified date string and update the given calendar instance
+   * accordingly.
+   *
+   * @param dateString  Date string to parse. Non-null.
+   * @param calendar    Calendar to populate. Non-null.
+   * @throws ParseException  If the dateString cannot be parsed according to ISO 8601.
+   */
+  private static void parseDate(String dateString, Calendar calendar)
     throws ParseException
   {
-		Calendar calendar = new GregorianCalendar(TimeZone.getTimeZone("UTC"));
-		calendar.setMinimalDaysInFirstWeek(4);
-		calendar.setFirstDayOfWeek(Calendar.MONDAY);
-		calendar.set(Calendar.HOUR_OF_DAY, 0);
-		calendar.set(Calendar.MINUTE, 0);
-		calendar.set(Calendar.SECOND, 0);
-		calendar.set(Calendar.MILLISECOND, 0);
+    assert dateString != null : "dateString cannot be null";
+    assert calendar != null : "calendar cannot be null";
 
-		String basicFormatDate = dateString.replaceAll("-", "");
+    // Make into basic form
+    String basicDateString = dateString.replaceAll("-", "");
 
-		if (basicFormatDate.indexOf('W') != -1)
-			return parseWeekDate(calendar, basicFormatDate);
+    int length = basicDateString.length();
+    boolean isWeekDate = basicDateString.indexOf('W') != -1;
+    boolean isOrdinalDate = length == 7;
 
-    else if (basicFormatDate.length() == 7)
-			return parseOrdinalDate(calendar, basicFormatDate);
+    //
+    // Case 1: yyyyWww[d]
+    //
+    if (isWeekDate) {
+      int year = Integer.parseInt(basicDateString.substring(0, 4));
+      int weekOfYear = Integer.parseInt(basicDateString.substring(5, 7));
+      int dayOfWeek = length == 7 ? Calendar.MONDAY : Integer.parseInt(basicDateString.substring(7));
+      calendar.set(Calendar.YEAR, year);
+      calendar.set(Calendar.WEEK_OF_YEAR, weekOfYear);
+      calendar.set(Calendar.DAY_OF_WEEK, dayOfWeek);
+    }
 
-    else
-			return parseCalendarDate(calendar, basicFormatDate, originalDate);
+    //
+    // Case 2: yyyyddd (ordinal date)
+    //
+    else if (isOrdinalDate) {
+      int year = Integer.parseInt(basicDateString.substring(0, 4));
+      int dayOfYear = Integer.parseInt(basicDateString.substring(4));
+      calendar.set(Calendar.YEAR, year);
+      calendar.set(Calendar.DAY_OF_YEAR, dayOfYear);
+    }
+
+    //
+    // Case 3: yy (century only, January 1, year 0 assumed)
+    //
+    else if (length == 2) {
+      int century = Integer.parseInt(basicDateString);
+      calendar.set(century * 100, 0, 1);
+    }
+
+    //
+    // Case 4: yyyy (year only, January 1 assumed)
+    //
+    else if (length == 4) {
+      int year = Integer.parseInt(basicDateString);
+      calendar.set(year, 0, 1);
+    }
+
+    //
+    // Date case 5: yyyymm (year month only, First day in month assumed)
+    //
+    else if (length == 6) {
+      int year = Integer.parseInt(basicDateString.substring(0, 4));
+      int month = Integer.parseInt(basicDateString.substring(4, 6)) - 1;
+      calendar.set(year, month, 1);
+    }
+
+    //
+    // Date case 6: yyyymmdd (standard case)
+    //
+    else if (length == 8) {
+      int year = Integer.parseInt(basicDateString.substring(0, 4));
+      int month = Integer.parseInt(basicDateString.substring(4, 6)) - 1;
+      int day = Integer.parseInt(basicDateString.substring(6));
+      calendar.set(year, month, day);
+    }
+
+    //
+    // Date case 7: Unparsable
+    //
+    else {
+      throw new ParseException("Invalid date format " + dateString, 0);
+    }
   }
 
-	private static Calendar parseCalendarDate(Calendar calendar, String basicFormatDate, String originalDate)
+  /**
+   * Parse the specified time string and update the given calendar instance
+   * accordingly.
+   *
+   * @param timeString  Time string to parse. Non-null.
+   * @param calendar    Calendar to populate. Non-null.
+   * @throws ParseException  If the timeString cannot be parsed according to ISO 8601.
+   */
+  private static void parseTime(String timeString, Calendar calendar)
     throws ParseException
   {
-		if (basicFormatDate.length() == 2)
-			return parseCalendarDateWithCenturyOnly(calendar, basicFormatDate);
+    assert timeString != null : "timeString cannot be null";
+    assert calendar != null : "calendar cannot be null";
 
-    else if (basicFormatDate.length() == 4)
-			return parseCalendarDateWithYearOnly(calendar, basicFormatDate);
+    String basicTimeString = timeString.replace(":", "").replace(",", ".");
 
-    else
-			return parseCalendarDateWithPrecisionGreaterThanYear(calendar, basicFormatDate, originalDate);
-	}
+    // Divide into whole and fractional part
+    int pos = basicTimeString.indexOf('.');
+    String wholePart = pos != -1 ? basicTimeString.substring(0, pos) : basicTimeString;
+    String fractionPart = pos != -1 ? basicTimeString.substring(pos + 1) : "0";
 
-	private static Calendar parseCalendarDateWithCenturyOnly(Calendar calendar, String basicFormatDate)
-  {
-		calendar.set(Integer.parseInt(basicFormatDate) * 100, 0, 1);
-		return calendar;
-	}
+    double fraction = Double.parseDouble("0." + fractionPart);
 
-	private static Calendar parseCalendarDateWithYearOnly(Calendar calendar, String basicFormatDate)
-  {
-		calendar.set(Integer.parseInt(basicFormatDate), 0, 1);
-		return calendar;
-	}
+    int length = wholePart.length();
 
-	private static Calendar parseCalendarDateWithPrecisionGreaterThanYear(Calendar calendar, String basicFormatDate, String originalDate)
-    throws ParseException
-  {
-		int year = Integer.parseInt(basicFormatDate.substring(0, 4));
-		int month = Integer.parseInt(basicFormatDate.substring(4, 6)) - 1;
+    //
+    // hh
+    //
+    if (length >= 2) {
+      int hour = Integer.parseInt(wholePart.substring(0, 2));
+      calendar.set(Calendar.HOUR_OF_DAY, hour);
+    }
 
-		if (basicFormatDate.length() == 6) {
-			calendar.set(year, month, 1);
-			return calendar;
-		}
+    //
+    // ..mm
+    //
+    if (length > 2) {
+      int minute = Integer.parseInt(wholePart.substring(2, 4));
+      calendar.set(Calendar.MINUTE, minute);
+    }
+    else {
+      fraction *= 60;
+    }
 
-		if (basicFormatDate.length() == 8) {
-			calendar.set(year, month, Integer.parseInt(basicFormatDate.substring(6)));
-			return calendar;
-		}
+    //
+    // ....ss
+    //
+    if (length > 4) {
+      int second = Integer.parseInt(wholePart.substring(4, 6));
+      calendar.set(Calendar.SECOND, second);
+    }
+    else {
+      fraction *= 60;
+    }
 
-		throw new ParseException("Can't parse " + originalDate, 0);
-	}
-
-	private static Calendar parseWeekDate(Calendar calendar, String basicFormatDate)
-  {
-		calendar.set(Calendar.YEAR, Integer.parseInt(basicFormatDate.substring(0, 4)));
-		calendar.set(Calendar.WEEK_OF_YEAR, Integer.parseInt(basicFormatDate.substring(5, 7)));
-		calendar.set(Calendar.DAY_OF_WEEK, basicFormatDate.length() == 7 ? Calendar.MONDAY : Calendar.SUNDAY + Integer.parseInt(basicFormatDate.substring(7)));
-		return calendar;
-	}
-
-	private static Calendar parseOrdinalDate(Calendar calendar, String basicFormatOrdinalDate)
-  {
-		calendar.set(Calendar.YEAR, Integer.parseInt(basicFormatOrdinalDate.substring(0, 4)));
-		calendar.set(Calendar.DAY_OF_YEAR, Integer.parseInt(basicFormatOrdinalDate.substring(4)));
-		return calendar;
-	}
+    int millisecond = (int) Math.round(fraction * 1000);
+    calendar.set(Calendar.MILLISECOND, millisecond);
+  }
 
   /**
-   * Parse the given string in ISO 8601 format and build a Date object.
+   * Parse the specified time zone string and update the given calendar instance
+   * accordingly.
    *
-   * @param  dateString  ISO8601 date string to convert. Non-null.
-   * @return A date instance. Never null.
-   * @throws IllegalArgumentException  If dateString is null.
-   * @throws ParseException If the supplied string is not valid according to ISO8601
+   * @param zoneString  Zone string to parse. Non-null.
+   * @param calendar    Calendar to populate. Non-null.
    */
-  public static Date parse(String dateString)
+  private static void parseZone(String zoneString, Calendar calendar)
+  {
+    assert zoneString != null : "<oneString cannot be null";
+    assert calendar != null : "calendar cannot be null";
+
+    // Without a time zone indicator, "local" time is assumed. If "local" is to be
+    // interpreted as "here", we could use TimeZone.getDefault() (the time zone of
+    // the current JVM), but this will give different results if executing the method
+    // in a different time zone. It is better to interpret "local" as "don't know"
+    // and associate them with UTC (being as good as anything) and at least get consistent
+    // results wherever the method is executed.
+    if (zoneString.isEmpty())
+      calendar.setTimeZone(TimeZone.getTimeZone("UTC")); // TimeZone.getDefault());
+
+    else if (zoneString.startsWith("Z"))
+      calendar.setTimeZone(TimeZone.getTimeZone("UTC"));
+
+    else {
+      if (zoneString.length() == 5)
+        zoneString = zoneString.substring(0, 3) + ':' + zoneString.substring(3, 5);
+      calendar.setTimeZone(TimeZone.getTimeZone("GMT" + zoneString));
+    }
+  }
+
+  /**
+   * Parse the given string in ISO 8601 format and return it as a Date object.
+   *
+   * @param  text  Text string to parse. Non-null.
+   * @return Corresponding date instance. Never null.
+   * @throws IllegalArgumentException  If text is null.
+   * @throws ParseException   If text is not a valid date time according to ISO8601
+   */
+  public static Date parse(String text)
     throws ParseException
   {
-		int indexOfT = dateString.indexOf('T');
-    if (indexOfT == -1)
-      indexOfT = dateString.indexOf(' ');
+    if (text == null)
+      throw new IllegalArgumentException("text cannot be null");
 
-    Calendar calendar;
+    text = text.toUpperCase();
 
-		if (indexOfT == -1) {
-			calendar = buildCalendarWithDateOnly(dateString, dateString);
-		}
-    else {
-      calendar = buildCalendarWithDateOnly(dateString.substring(0, indexOfT), dateString);
-      calendar = parseHour(calendar, dateString.substring(indexOfT + 1));
-    }
+    // Initiate a calendar instance we can populate
+    Calendar calendar = new GregorianCalendar(TimeZone.getTimeZone("UTC"));
+    calendar.setMinimalDaysInFirstWeek(4);
+    calendar.setFirstDayOfWeek(Calendar.MONDAY);
+    calendar.set(Calendar.HOUR_OF_DAY, 0);
+    calendar.set(Calendar.MINUTE, 0);
+    calendar.set(Calendar.SECOND, 0);
+    calendar.set(Calendar.MILLISECOND, 0);
+    calendar.setLenient(true); // Allow wrap-overs
+
+    //
+    // Split string into dateText, timeText and zoneText component
+    //
+    int p = text.indexOf('T');
+    if (p == -1)
+      p = text.indexOf(' '); // Not strictly ISO8601, but common so we allow it
+
+    String dateText = p != -1 ? text.substring(0, p) : text;
+    String timeAndZoneText = p != -1 ? text.substring(p + 1) : "";
+
+    p = timeAndZoneText.indexOf('Z');
+    if (p == -1)
+      p = timeAndZoneText.indexOf('+');
+    if (p == -1)
+      p = timeAndZoneText.indexOf('-');
+
+    String timeText = p != -1 ? timeAndZoneText.substring(0, p) : timeAndZoneText;
+    String zoneText = p != -1 ? timeAndZoneText.substring(p) : "";
+
+    //
+    // Parse the individual parts and update accordingly
+    //
+    parseDate(dateText, calendar);
+    parseTime(timeText, calendar);
+    parseZone(zoneText, calendar);
 
     return calendar.getTime();
   }
@@ -199,8 +311,9 @@ public final class ISO8601DateParser
   /**
    * Generate a ISO 8601 string representation of the specified date.
    *
-   * @param date The date to create string representation of. Non-null.
-   * @return     String representing the date in the ISO 8601 format. Never null.
+   * @param date The date to create string representation of. UTC assumed. Non-null.
+   * @return     String representing the date/time in the ISO 8601 format.
+   *             Never null.
    * @throws IllegalArgumentException  If date is null.
    */
   public static String toString(Date date)
@@ -208,89 +321,6 @@ public final class ISO8601DateParser
     if (date == null)
       throw new IllegalArgumentException("date cannot be null");
 
-    return date.toInstant().toString();
-  }
-
-  public static void main(String[] arguments)
-  {
-    // See https://www.myintervals.com/blog/2009/05/20/iso-8601-date-validation-that-doesnt-suck/
-    String[] validDates = new String[] {
-      "2009-12T12:34",
-      "2009",
-      "2009-05-19",
-      "2009-05-19",
-      "20090519",
-      "2009123",
-      "2009-05",
-      "2009-123",
-      "2009-222",
-      "2009-001",
-      "2009-W01-1",
-      "2009-W51-1",
-      "2009-W511",
-      "2009-W33",
-      "2009W511",
-      "2009-05-19",
-      "2009-05-19 00:00",
-      "2009-05-19 14",
-      "2009-05-19 14:31",
-      "2009-05-19 14:39:22",
-      "2009-05-19T14:39Z",
-      "2009-W21-2",
-      "2009-W21-2T01:22",
-      "2009-139",
-      "2009-05-19 14:39:22-06:00",
-      "2009-05-19 14:39:22+0600",
-      "2009-05-19 14:39:22-01",
-      "20090621T0545Z",
-      "2007-04-06T00:00",
-      "2007-04-05T24:00",
-      "2010-02-18T16:23:48.5",
-      "2010-02-18T16:23:48,444",
-      "2010-02-18T16:23:48,3-06:00",
-      "2010-02-18T16:23.4",
-      "2010-02-18T16:23,25",
-      "2010-02-18T16:23.33+0600",
-      "2010-02-18T16.23334444",
-      "2010-02-18T16,2283",
-      "2009-05-19 143922.500",
-      "2009-05-19 1439,55"
-    };
-
-    String[] invalidDates = new String[] {
-      "200905",
-      "2009367",
-      "2009-",
-      "2007-04-05T24:50",
-      "2009-000",
-      "2009-M511",
-      "2009M511",
-      "2009-05-19T14a39r",
-      "2009-05-19T14:3924",
-      "2009-0519",
-      "2009-05-1914:39",
-      "2009-05-19 14:",
-      "2009-05-19r14:39",
-      "2009-05-19 14a39a22",
-      "200912-01",
-      "2009-05-19 14:39:22+06a00",
-      "2009-05-19 146922.500",
-      "2010-02-18T16.5:23.35:48",
-      "2010-02-18T16:23.35:48",
-      "2010-02-18T16:23.35:48.45",
-      "2009-05-19 14.5.44",
-      "2010-02-18T16:23.33.600",
-      "2010-02-18T16,25:23:48,444"
-    };
-
-    for (String dateString : validDates) {
-      try {
-        Date date = ISO8601DateParser.parse(dateString);
-        System.out.println(date + "      " + ISO8601DateParser.toString(date));
-      }
-      catch (Exception exception) {
-        System.out.println("-- EXCEPTION -- " + exception.getMessage());
-      }
-    }
+    return DateTimeFormatter.ISO_DATE_TIME.withZone(ZoneOffset.UTC).format(Instant.ofEpochMilli(date.getTime()));
   }
 }
