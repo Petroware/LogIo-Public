@@ -4,7 +4,7 @@ import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 
 /**
- * A class capable of formatting (i.\ e. write as text) numbers so that
+ * A class capable of formatting (i.e write as text) numbers so that
  * they get uniform appearance and can be presented together, typically
  * in a column with decimal symbol aligned etc.
  *
