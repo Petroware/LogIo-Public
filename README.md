@@ -18,7 +18,7 @@ Log I/O web page: https://petroware.no/logio.html
 
 ## Setup
 
-Capture the UoM code to local disk by:
+Capture the Log I/O code to local disk by:
 
 ```
 $ git clone https://github.com/Petroware/LogIo.git
