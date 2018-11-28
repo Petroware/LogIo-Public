@@ -424,6 +424,10 @@ public final class JsonFile
     Object object = JsonUtil.findObject(jsonParser, key);
     jsonParser.close();
 
+    // Since Util.getAsType() return null for empty string
+    if (object instanceof String && object.toString().isEmpty())
+      return "";
+
     return (String) Util.getAsType(object, String.class);
   }
 
