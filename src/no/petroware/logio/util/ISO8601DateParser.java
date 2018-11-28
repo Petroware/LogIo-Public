@@ -11,9 +11,8 @@ import java.util.TimeZone;
 
 /**
  * Date parser for the ISO 8601 format.
- * See <a href="https://en.wikipedia.org/wiki/ISO_8601">https://en.wikipedia.org/wiki/ISO_8601</a>
  * <p>
- * Java/SDK have several implementation of ISO8601 parsers, but neither
+ * Java/SDK have several implementation of ISO 8601 parsers, but neither
  * comply to all aspects of the format so we do it properly here.
  * <p>
  * An ISO 8601 date/time representation has the following form:
@@ -24,16 +23,21 @@ import java.util.TimeZone;
  * but often a space is used instead. This is not allowed by ISO 8601, but
  * we allow it here anyway.
  * <p>
- * &lt;date&gt; ha the following form (hyphens are optional):
+ * &lt;date&gt; has the following form (hyphens are optional):
  * <pre>
  *   2018-11-24    ; Normal form
  *   2018-11       ; Year and month only, day = 01 implied
  *   2018          ; Year only, January 1 implied
- *   2018-W47      ; Week number. 1 day of week implied
+ *   2018-W47      ; Week number. First day of week implied
  *   2018-W47-6    ; Week number and day of week
  *   2018-328      ; Ordinal date (day number of year)
  *   20            ; Century only. January 1, 00 assumed
  * </pre>
+ * <p>
+ * Note that the standard has opening for using years with more than four
+ * digits, prefixed by +/- "if agreed by the communicating parties".
+ * We don't support this here since we don't have a communicating partner
+ * anyway.
  * <p>
  * &lt;time&gt; (optional) has the following form (colons are optional,
  * fraction delimiter can be dot or comma):
@@ -43,8 +47,8 @@ import java.util.TimeZone;
  *   13:42         ; Hour and minutes only. second 0 implied
  *   13            ; Hour only. minute 0 and second 0 implied
  *   13:42:15.5201 ; Fractional seconds
- *   13:42.5201    ; Fractional minutes
- *   13.5          ; Fractional hours
+ *   13:42.123     ; Fractional minutes
+ *   13.13389      ; Fractional hours
  * </pre>
  * <p>
  * &lt;zone&gt; (optional) has the following form (colons are optional):
@@ -55,11 +59,11 @@ import java.util.TimeZone;
  *   +hh           ; Number of hours ahead (+) or behind (-) UTC
  * </pre>
  * If time zone is not specified, "local" time is assumed. If "local" is to be
- * interpreted as "here", we could use TimeZone.getDefault() (the time zone of
- * the current JVM), but this will give different results if the parser is executed
- * in a different time zone. It is better to interpret "local" as "don't know"
- * and associate it with UTC (being as good as anything) and at least get consistent
- * results wherever the class is used.
+ * interpreted as "here", we could use the current time zone of the running JVM,
+ * but this will give different results if the parser is executed in a different
+ * time zone. It is better to interpret "local" as "don't know" and associate it
+ * with UTC (being as good as anything) and at least get consistent results
+ * wherever the class is used.
  * <p>
  * <b>NOTE:</b> The parser is <em>lenient</em> meaning that it may accept
  * sensible input that not necessarily follow the ISO 8601 strictly.
@@ -247,6 +251,10 @@ public final class ISO8601DateParser
       calendar.setTimeZone(TimeZone.getTimeZone("UTC"));
 
     else {
+      // We have removed the optional colon from the zone string, but the
+      // TimeZone class needs this, so we reintroduce it here.
+      // The getTimeZone() method doesn't throw exception on illegal syntax
+      // so anything other than +/-hh[:mm] will end up as GMT.
       if (zoneString.length() == 5)
         zoneString = zoneString.substring(0, 3) + ':' + zoneString.substring(3, 5);
       calendar.setTimeZone(TimeZone.getTimeZone("GMT" + zoneString));
@@ -254,12 +262,13 @@ public final class ISO8601DateParser
   }
 
   /**
-   * Parse the given string in ISO 8601 format and return it as a Date object.
+   * Parse the given string in ISO 8601 date/time format and return it as
+   * a Date object.
    *
    * @param  text  Text string to parse. Non-null.
    * @return Corresponding date instance. Never null.
    * @throws IllegalArgumentException  If text is null.
-   * @throws ParseException   If text is not a valid date time according to ISO8601
+   * @throws ParseException   If text is not a valid date time according to ISO 8601
    */
   public static Date parse(String text)
     throws ParseException
@@ -284,7 +293,7 @@ public final class ISO8601DateParser
     //
     int p = text.indexOf('T');
     if (p == -1)
-      p = text.indexOf(' '); // Not strictly ISO8601, but common so we allow it
+      p = text.indexOf(' '); // Not strictly ISO 8601, but common so we allow it
 
     String dateText = p != -1 ? text.substring(0, p) : text;
     String timeAndZoneText = p != -1 ? text.substring(p + 1) : "";
@@ -299,7 +308,7 @@ public final class ISO8601DateParser
     String zoneText = p != -1 ? timeAndZoneText.substring(p) : "";
 
     //
-    // Parse the individual parts and update accordingly
+    // Parse the individual parts and update calendar accordingly
     //
     parseDate(dateText, calendar);
     parseTime(timeText, calendar);
