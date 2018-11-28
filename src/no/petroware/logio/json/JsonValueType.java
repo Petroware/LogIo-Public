@@ -93,9 +93,15 @@ enum JsonValueType
   {
     assert clazz != null : "clazz cannot be null";
 
-    for (JsonValueType valueType : JsonValueType.values())
+    // Search for exact match
+    for (JsonValueType valueType : JsonValueType.values()) {
       if (valueType.getValueType() == clazz)
         return valueType;
+    }
+
+    //
+    // Search the obvious relations
+    //
 
     if (clazz == Double.class)
       return FLOAT;
@@ -115,6 +121,9 @@ enum JsonValueType
     if (clazz == Long.class)
       return INTEGER;
 
+    //
+    // Anything else is classified as floating point numbers
+    //
     return FLOAT;
   }
 
