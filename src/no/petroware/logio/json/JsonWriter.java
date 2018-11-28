@@ -766,10 +766,8 @@ public final class JsonWriter
    *                     If isPretty is false, this setting has no effect.
    * @return             The requested string. Never null.
    * @throws IllegalArgumentException  If jsonFiles is null or indentation is out of bounds.
-   * @throws IOException               If the write operation fails for some reason.
    */
   public static String toString(List<JsonFile> jsonFiles, boolean isPretty, int indentation)
-    throws IOException
   {
     if (jsonFiles == null)
       throw new IllegalArgumentException("jsonFiles cannot be null");
@@ -780,11 +778,29 @@ public final class JsonWriter
     ByteArrayOutputStream stringStream = new ByteArrayOutputStream();
     JsonWriter writer = new JsonWriter(stringStream, isPretty, indentation);
 
-    for (JsonFile jsonFile : jsonFiles)
-      writer.write(jsonFile);
-    writer.close();
+    String string = "";
 
-    return new String(stringStream.toByteArray(), "UTF-8");
+    try {
+      for (JsonFile jsonFile : jsonFiles)
+        writer.write(jsonFile);
+    }
+    catch (IOException exception) {
+      // Since we are writing to memory (ByteArrayOutputStream) we don't really
+      // expect an IOException so if we get one anyway, we are in serious trouble
+      throw new RuntimeException("Unable to write", exception);
+    }
+    finally {
+      try {
+        writer.close();
+        string = new String(stringStream.toByteArray(), "UTF-8");
+      }
+      catch (IOException exception) {
+        // Again: This will never happen.
+        throw new RuntimeException("Unable to write", exception);
+      }
+    }
+
+    return string;
   }
 
   /**
@@ -798,10 +814,8 @@ public final class JsonWriter
    *                     If isPretty is false, this setting has no effect.
    * @return             The requested string. Never null.
    * @throws IllegalArgumentException  If jsonFile is null or indentation is out of bounds.
-   * @throws IOException               If the write operation fails for some reason.
    */
   public static String toString(JsonFile jsonFile, boolean isPretty, int indentation)
-    throws IOException
   {
     if (jsonFile == null)
       throw new IllegalArgumentException("jsonFile cannot be null");
@@ -812,5 +826,21 @@ public final class JsonWriter
     List<JsonFile> jsonFiles = new ArrayList<>();
     jsonFiles.add(jsonFile);
     return toString(jsonFiles, isPretty, indentation);
+  }
+
+  /**
+   * Convenience method for writing the content of the specified JSON
+   * file to a pretty printed string.
+   *
+   * @param jsonFile  JSON files to write. Non-null.
+   * @return          The requested string. Never null.
+   * @throws IllegalArgumentException  If jsonFile is null.
+   */
+  public static String toString(JsonFile jsonFile)
+  {
+    if (jsonFile == null)
+      throw new IllegalArgumentException("jsonFile cannot be null");
+
+    return toString(jsonFile, true, 2);
   }
 }
