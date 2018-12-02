@@ -6,7 +6,9 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.text.ParseException;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -20,9 +22,15 @@ import javax.json.stream.JsonParser;
 import javax.json.stream.JsonParsingException;
 
 import no.petroware.logio.util.Util;
+import no.petroware.logio.util.ISO8601DateParser;
 
 /**
  * Class for validating JSON Well Log Format files.
+ * <p>
+ * Usage:
+ * <pre>
+ *   List<JsonValidator.Message> messages = JsonValidator.getInstance().validate(new File("path/to/file.JSON"));
+ * </pre>
  *
  * @author <a href="mailto:info@petroware.no">Petroware AS</a>
  */
@@ -254,12 +262,12 @@ public final class JsonValidator
 
     Class<?> valueType = jsonFile.getIndexValueType();
 
+    // Compute actual step as average of min and max step
     Double actualStep = minStep != null ? (minStep + maxStep) / 2.0 : null;
     if (actualStep != null && minStep != null && Math.abs(actualStep - minStep) > 0.001)
       actualStep = null;
 
-    // We will also validate the start/end/step metadata compared
-    // to the actual such in the data section
+    // Find start/end/step from metadata represented as double value
     double startIndex = Util.getAsDouble(jsonFile.getStartIndex());
     double endIndex = Util.getAsDouble(jsonFile.getEndIndex());
     double step = Util.getAsDouble(jsonFile.getStep());
@@ -330,6 +338,7 @@ public final class JsonValidator
   {
     assert jsonParser != null : "jsonParser cannot be null";
     assert jsonFile != null : "jasonFile cannot be null";
+    assert messages != null : "messages cannot be null";
 
     int curveNo = 0;
     int dimension = 0;
@@ -466,7 +475,7 @@ public final class JsonValidator
   }
 
   /**
-   * Validate the data object at the current parser position against
+   * Validate the curve definition object at the current parser position against
    * the specified JSON file instance.
    *
    * @param jsonParser  JSON parser. Non-null.
@@ -692,11 +701,21 @@ public final class JsonValidator
       if (!wellKnownProperties.contains(actualProperty))
         messages.add(new Message(Message.Level.WARNING, null, "Unrecognized property \"" + actualProperty + "\"."));
     }
+
+    // Check date specifically
+    String dateString = jsonFile.getPropertyAsString("date");
+    if (dateString != null && !dateString.isEmpty()) {
+      try {
+        ISO8601DateParser.parse(dateString);
+      }
+      catch (ParseException exception) {
+        messages.add(new Message(Message.Level.WARNING, null, "Invalid date entry \"" + dateString + "\"."));
+      }
+    }
   }
 
   /**
-   * Read "log" object from the current position in the file
-   * and return as a JsonFile instance.
+   * Validate the log object at the current position in the JSON parser.
    *
    * @param jsonParser    The parser. Non-null.
    * @param messages      Validation messages to append to. Non-null.
