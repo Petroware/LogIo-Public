@@ -2,6 +2,7 @@ package no.petroware.logio.util;
 
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
+import java.util.Locale;
 
 /**
  * A class capable of formatting (i.e write as text) numbers so that
@@ -28,86 +29,160 @@ public final class Formatter
   private final DecimalFormat format_;
 
   /**
-   * Create a common formatter for the set of numbers.
+   * Return number of significant decimals there is in the
+   * specified floating point value.
    *
-   * @param values             Representative values to use for creating the format. Non-null.
-   * @param nSignificantDigits Optional number of significant digits. Defaults to 7 if not specified.
-   * @param nDecimals          Optional number of decimals. Defaults to 2 if not specified.
-   * @throws IllegalArgumentException  If values is null.
+   * @param d  Number to check.
+   * @return   Number of decimals. [0,&gt;.
    */
-  public Formatter(double[] values, Integer nSignificantDigits, Integer nDecimals)
+  private static int countDecimals(double d)
   {
+    if (Double.isNaN(d))
+      return 0;
+
+    if (Double.isInfinite(d))
+      return 0;
+
+    d = Math.abs(d);
+
+    long wholePart = Math.round(d);
+    int nSignificant = ("" + wholePart).length();
+
+    double fractionPart = d - wholePart;
+
+    int nDecimals = 0;
+    int order = 1;
+    while (true) {
+      double floating = fractionPart * order;
+      long whole = Math.round(floating);
+
+      double eps = Math.abs(whole - floating);
+      double diff = whole != 0.0 ? eps / whole : eps;
+
+      if (diff < 0.0001)
+        break;
+
+      if (nSignificant >= 12)
+        break;
+
+      order *= 10;
+      nDecimals++;
+      nSignificant++;
+    }
+
+    return nDecimals;
+  }
+
+  /**
+   * Create a common formatter for the specified set of numbers.
+   *
+   * @param values              Representative values to use for creating the formatter.
+   *                            Null to create a generic formatter independent of any
+   *                            actual values.
+   * @param nSignificantDigits  Number of significant digits. Defaults to 7 if null.
+   *                            Ignored if nDecimals is specified.
+   * @param nDecimals           Number of decimals. If null, decide by significan digits.
+   * @param locale              Locale to present numbers in. Null for default.
+   */
+  public Formatter(double[] values, Integer nSignificantDigits, Integer nDecimals, Locale locale)
+  {
+    int nActualSignificantDigits = nSignificantDigits != null ? nSignificantDigits : N_SIGNIFICANT_DEFAULT;
+    int nActualDecimals = N_DECIMALS_DEFAULT;
+    Locale actualLocale = locale != null ? locale : Locale.ROOT;
+
+    double maxValue = 0.0;
+
     boolean isScientific = false;
 
-    int nSignificant = nSignificantDigits != null ? nSignificantDigits : N_SIGNIFICANT_DEFAULT;
-    int nDec = N_DECIMALS_DEFAULT;
-
-    double maxValue = -1.0;
+    // Maximum number of decimals needed to represent the values provided
+    int nMaxDecimalsNeeded = 0;
 
     //
     // Loop over all the representative values to find the maximum
     // and to check if we should use scientific notation.
     //
-    for (int i = 0; i < values.length; i++) {
+    if (values != null) {
+      for (int i = 0; i < values.length; i++) {
 
-      double value = values[i];
+        double value = values[i];
 
-      // Leave non-printable characters
-      if (Double.isNaN(value) || Double.isInfinite(value))
-        continue;
+        // Leave non-printable characters
+        if (Double.isNaN(value) || Double.isInfinite(value))
+          continue;
 
-      // Work with the absolute value only
-      value = Math.abs(value);
+        // Work with the absolute value only
+        value = Math.abs(value);
 
-      if (value > 0.0 && (value < MIN_NON_SCIENTIFIC || value > MAX_NON_SCIENTIFIC)) {
-        isScientific = true;
-        nDec = nSignificant - 1;
-        break;
+        //
+        // Check if we should go scientific
+        //
+        if (value > MAX_NON_SCIENTIFIC || value != 0.0 && value < MIN_NON_SCIENTIFIC) {
+          isScientific = true;
+          nActualDecimals = nActualSignificantDigits - 1;
+          break;
+        }
+
+        // Keep track of maximum numeric value of the lot
+        if (value > maxValue)
+          maxValue = value;
+
+        // Find how many decimals is needed to represent this value correctly
+        int nDecimalsNeeded = countDecimals(value);
+        if (nDecimalsNeeded > nMaxDecimalsNeeded)
+          nMaxDecimalsNeeded = nDecimalsNeeded;
       }
-
-      if (value > maxValue)
-        maxValue = value;
     }
 
+    //
+    // Determine n decimals for the non-scietific case
+    //
     if (!isScientific) {
       long wholePart = Math.round(maxValue);
       int length = ("" + wholePart).length();
-      nDec = Math.max(nSignificant - length, 0);
+      nActualDecimals = Math.max(nActualSignificantDigits - length, 0);
+
+      // If there are values provided, and they need fewer decimals
+      // than computed, we reduce this
+      if (values != null && values.length > 0 && nMaxDecimalsNeeded < nActualDecimals)
+        nActualDecimals = nMaxDecimalsNeeded;
     }
 
+    // Override n decimals on users request
     if (nDecimals != null)
-      nDec = nDecimals;
+      nActualDecimals = nDecimals;
 
-    // Create the decimal format
-    StringBuilder s = new StringBuilder();
+    //
+    // Create the format string
+    //
+    StringBuilder formatString = new StringBuilder();
     if (isScientific) {
-      s.append("0.E0");
-      for (int i = 0; i < nDec; i++)
-        s.insert(2, '0');
+      formatString.append("0.E0");
+      for (int i = 0; i < nActualDecimals; i++)
+        formatString.insert(2, '0');
     }
     else {
-      s.append(nDec > 0 ? "0." : "0");
-      for (int i = 0; i < nDec; i++)
-        s.append('0');
+      formatString.append(nActualDecimals > 0 ? "0." : "0");
+      for (int i = 0; i < nActualDecimals; i++)
+        formatString.append('0');
     }
 
-    // This is the format that can be used to format
-    // values of similar type to the representation values.
-    DecimalFormatSymbols formatSymbols = new DecimalFormatSymbols();
-    formatSymbols.setDecimalSeparator('.');
-
-    format_ = new DecimalFormat(s.toString(), formatSymbols);
+    //
+    // Create the actual decimal format
+    //
+    DecimalFormatSymbols formatSymbols = new DecimalFormatSymbols(actualLocale);
+    format_ = new DecimalFormat(formatString.toString(), formatSymbols);
   }
 
   /**
-   * Create a common formatter for the set of numbers.
-   * Use default values for significant digits and decimals.
+   * Create a common formatter for the specified set of numbers.
    *
-   * @param values  Representative values to use for creating the format. Non-null.
+   * @param values              Representative values to use for creating the formatter.
+   *                            Null to create a generic formatter independent of any
+   *                            actual values.
    */
   public Formatter(double[] values)
   {
-    this(values, null, null);
+    this(values, null, null, null);
   }
 
   /**
@@ -115,7 +190,7 @@ public final class Formatter
    */
   public Formatter()
   {
-    this(new double[] {1.0});
+    this(null, null, null, null);
   }
 
   /**
@@ -131,10 +206,21 @@ public final class Formatter
     if (Double.isNaN(value) || Double.isInfinite(value))
       return "";
 
-    // 0.0 is handled specifically to avoid 0.0000 etc
+    // 0.0 easily gets lost if written with many decimals like 0.00000.
+    // Consequently we write this as either 0.0 or 0
     if (value == 0.0)
-      return "0.0";
+      return format_.getMaximumFractionDigits() == 0 ? "0" : "0.0";
 
     return format_.format(value);
+  }
+
+  /**
+   * Return the back-end decimal format of this formatter.
+   *
+   * @return  The back-end decimal format of this formatter. Never null.
+   */
+  public DecimalFormat getFormat()
+  {
+    return format_;
   }
 }
