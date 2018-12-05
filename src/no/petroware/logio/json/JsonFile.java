@@ -1045,7 +1045,7 @@ public final class JsonFile
 
     int nSignificantDigits = isIndexCurve ? getNSignificantDigits(curve) : 6;
 
-    return new Formatter(values, nSignificantDigits, nDecimals);
+    return new Formatter(values, nSignificantDigits, nDecimals, null);
   }
 
   /** {@inheritDoc} */
