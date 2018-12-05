@@ -10,6 +10,7 @@ import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
@@ -32,8 +33,8 @@ import no.petroware.logio.util.Util;
  *   JsonFile jsonFile = new JsonFile();
  *   :
  *
- *   // Writ as human readable with indentation = 2
- *   JsonWriter writer = new JsonWriter(new File("path/to/file"), true, 2);
+ *   // Write to file, human readable with 2 space indentation
+ *   JsonWriter writer = new JsonWriter(new File("path/to/file.json"), true, 2);
  *   writer.write(jsonFile);
  *   writer.close();
  * </pre>
@@ -41,6 +42,10 @@ import no.petroware.logio.util.Util;
  * If there is to much data to keep in memory, it is possible to write in a
  * <em>streaming</em> manner by adding curve data and appending the output
  * file alternately, see {@link #append}.
+ * <p>
+ * Note that the pretty print mode of this writer will behave different than
+ * a standard JSON writer in that it writes curve data arrays horizontally
+ * with each curve vertically aligned.
  *
  * @author <a href="mailto:info@petroware.no">Petroware AS</a>
  */
@@ -56,10 +61,16 @@ public final class JsonWriter
   /** True to write in human readable pretty format, false to write dense. */
   private final boolean isPretty_;
 
-  /** The new line token according to pretty print mode. Cached for efficiency. */
+  /**
+   * The new line token according to pretty print mode. Either "\n" or "".
+   * Cached for efficiency.
+   */
   private final String newline_;
 
-  /** Spacing between tokens according to pretty print mode. Cached for efficiency. */
+  /**
+   * Spacing between tokens according to pretty print mode. Either " " or "".
+   * Cached for efficiency.
+   */
   private final String spacing_;
 
   /** Current indentation according to pretty print mode. */
@@ -288,7 +299,9 @@ public final class JsonWriter
     assert jsonParser != null : "jsonParser cannot be null";
     assert indentation != null : "indentation cannot be null";
 
-    writer_.write(" [\n");
+    writer_.write(spacing_);
+    writer_.write('[');
+    writer_.write(newline_);
 
     boolean isFirst = true;
 
@@ -313,13 +326,13 @@ public final class JsonWriter
       }
 
       else if (parseEvent == JsonParser.Event.END_ARRAY) {
-        writer_.write("]");
+        writer_.write(']');
         return;
       }
 
       else if (parseEvent == JsonParser.Event.VALUE_FALSE) {
         if (!isFirst)
-          writer_.write(",\n");
+          writer_.write("," + newline_);
         writer_.write(indentation.toString());
         writer_.write("false");
         isFirst = false;
@@ -327,7 +340,7 @@ public final class JsonWriter
 
       else if (parseEvent == JsonParser.Event.VALUE_TRUE) {
         if (!isFirst)
-          writer_.write(",\n");
+          writer_.write("," + newline_);
         writer_.write(indentation.toString());
         writer_.write("true");
         isFirst = false;
@@ -335,7 +348,7 @@ public final class JsonWriter
 
       else if (parseEvent == JsonParser.Event.VALUE_NULL) {
         if (!isFirst)
-          writer_.write(",\n");
+          writer_.write("," + newline_);
         writer_.write(indentation.toString());
         writer_.write("null");
         isFirst = false;
@@ -343,7 +356,7 @@ public final class JsonWriter
 
       else if (parseEvent == JsonParser.Event.VALUE_NUMBER) {
         if (!isFirst)
-          writer_.write(",\n");
+          writer_.write("," + newline_);
         writer_.write(indentation.toString());
         BigDecimal value = jsonParser.getBigDecimal();
         writer_.write(value.toString());
@@ -352,7 +365,7 @@ public final class JsonWriter
 
       else if (parseEvent == JsonParser.Event.VALUE_STRING) {
         if (!isFirst)
-          writer_.write(",\n");
+          writer_.write("," + newline_);
         writer_.write(indentation.toString());
         String value = jsonParser.getString();
         writer_.write(value);
@@ -376,7 +389,7 @@ public final class JsonWriter
     assert indentation != null : "indentation cannot be null";
 
     writer_.write(spacing_);
-    writer_.write("{");
+    writer_.write('{');
     writer_.write(newline_);
 
     boolean isFirst = true;
@@ -388,7 +401,7 @@ public final class JsonWriter
         String key = jsonParser.getString();
 
         if (!isFirst) {
-          writer_.write(",");
+          writer_.write(',');
           writer_.write(newline_);
         }
 
@@ -396,7 +409,7 @@ public final class JsonWriter
         writer_.write('\"');
         writer_.write(key);
         writer_.write('\"');
-        writer_.write(":");
+        writer_.write(':');
         isFirst = false;
       }
 
@@ -489,30 +502,38 @@ public final class JsonWriter
 
         if (curveNo == 0) {
           writer_.write(indentation.toString());
-          writer_.write("[");
+          writer_.write('[');
         }
 
         if (nDimensions > 1) {
-          if (curveNo > 0)
-            writer_.write(", ");
+          if (curveNo > 0) {
+            writer_.write(',');
+            writer_.write(spacing_);
+          }
 
-          writer_.write("[");
+          writer_.write('[');
           for (int dimension = 0; dimension < nDimensions; dimension ++) {
             Object value = curve.getValue(dimension, index);
             String text = getText(value, valueType, formatter, width);
 
-            if (dimension > 0)
-              writer_.write(", ");
+            if (dimension > 0) {
+              writer_.write(',');
+              writer_.write(spacing_);
+            }
+
             writer_.write(text);
           }
-          writer_.write("]");
+          writer_.write(']');
         }
         else {
           Object value = curve.getValue(0, index);
           String text = getText(value, valueType, formatter, width);
 
-          if (curveNo > 0)
-            writer_.write(", ");
+          if (curveNo > 0) {
+            writer_.write(',');
+            writer_.write(spacing_);
+          }
+
           writer_.write(text);
         }
       }
@@ -546,8 +567,8 @@ public final class JsonWriter
     // Create the writer on first write operation
     if (isFirstLog) {
       OutputStream outputStream = file_ != null ? new FileOutputStream(file_) : outputStream_;
-      writer_ = new BufferedWriter(new OutputStreamWriter(outputStream));
-      writer_.write("{");
+      writer_ = new BufferedWriter(new OutputStreamWriter(outputStream, StandardCharsets.UTF_8));
+      writer_.write('{');
       writer_.write(newline_);
     }
 
@@ -555,7 +576,7 @@ public final class JsonWriter
     else {
       writer_.write(newline_);
       writer_.write(indentation_.push().push().toString());
-      writer_.write("]");
+      writer_.write(']');
       writer_.write(newline_);
 
       writer_.write(indentation_.push().toString());
@@ -568,7 +589,7 @@ public final class JsonWriter
     writer_.write(indentation.toString());
     writer_.write("\"log\":");
     writer_.write(spacing_);
-    writer_.write("{");
+    writer_.write('{');
     writer_.write(newline_);
 
     indentation = indentation.push();
@@ -600,12 +621,12 @@ public final class JsonWriter
     for (JsonCurve curve : curves) {
 
       if (!isFirstCurve)
-        writer_.write(",");
+        writer_.write(',');
 
       writer_.write(newline_);
       indentation = indentation.push();
       writer_.write(indentation.toString());
-      writer_.write("{");
+      writer_.write('{');
       writer_.write(newline_);
       indentation = indentation.push();
 
@@ -614,7 +635,7 @@ public final class JsonWriter
       writer_.write("\"name\":");
       writer_.write(spacing_);
       writer_.write(getText(curve.getName()));
-      writer_.write(",");
+      writer_.write(',');
       writer_.write(newline_);
 
       // Description
@@ -622,7 +643,7 @@ public final class JsonWriter
       writer_.write("\"description\":");
       writer_.write(spacing_);
       writer_.write(getText(curve.getDescription()));
-      writer_.write(",");
+      writer_.write(',');
       writer_.write(newline_);
 
       // Quantity
@@ -630,7 +651,7 @@ public final class JsonWriter
       writer_.write("\"quantity\":");
       writer_.write(spacing_);
       writer_.write(getText(curve.getQuantity()));
-      writer_.write(",");
+      writer_.write(',');
       writer_.write(newline_);
 
       // Unit
@@ -638,7 +659,7 @@ public final class JsonWriter
       writer_.write("\"unit\":");
       writer_.write(spacing_);
       writer_.write(getText(curve.getUnit()));
-      writer_.write(",");
+      writer_.write(',');
       writer_.write(newline_);
 
       // Value type
@@ -646,7 +667,7 @@ public final class JsonWriter
       writer_.write("\"valueType\":");
       writer_.write(spacing_);
       writer_.write(getText(JsonValueType.get(curve.getValueType()).toString()));
-      writer_.write(",");
+      writer_.write(',');
       writer_.write(newline_);
 
       // Dimension
@@ -658,7 +679,7 @@ public final class JsonWriter
 
       indentation = indentation.pop();
       writer_.write(indentation.toString());
-      writer_.write("}");
+      writer_.write('}');
       indentation = indentation.pop();
 
       isFirstCurve = false;
@@ -666,7 +687,7 @@ public final class JsonWriter
 
     writer_.write(newline_);
     writer_.write(indentation.toString());
-    writer_.write("]");
+    writer_.write(']');
 
     writer_.write(',');
 
@@ -713,7 +734,7 @@ public final class JsonWriter
       throw new IllegalStateException("Writer is not open");
 
     if (hasData_) {
-      writer_.write(",");
+      writer_.write(',');
       writer_.write(newline_);
     }
 
@@ -739,16 +760,16 @@ public final class JsonWriter
     // Complete the data array
     writer_.write(newline_);
     writer_.write(indentation_.push().push().toString());
-    writer_.write("]");
+    writer_.write(']');
     writer_.write(newline_);
 
     // Complete the log object
     writer_.write(indentation_.push().toString());
-    writer_.write("}");
+    writer_.write('}');
     writer_.write(newline_);
 
     // Complete the JSON object
-    writer_.write("}");
+    writer_.write('}');
     writer_.write(newline_);
 
     writer_.close();
