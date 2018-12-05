@@ -49,7 +49,7 @@ Java: https://petroware.no/logio/javadoc/index.html
 ## Programming examples
 
 
-### JSON Read
+### Read
 
 Example for reading a JSON Well Log file:
 
@@ -71,7 +71,7 @@ If files are larger than physical memory it is possible to process the content
 in a streaming manner by adding a `JsonDataListener` to the `read()` call.
 
 
-### JSON Validate
+### Validate
 
 Example for validating a JSON Well Log file:
 
@@ -88,7 +88,7 @@ The messages are of different severity and points to potential
 problems at specific locations in the input file.
 
 
-### JSON Write
+### Write
 
 Example for creating a JSON Well Log file from scratch:
 
@@ -134,7 +134,7 @@ jsonFile.setEndIndex(jsonFile.getActualEndIndex());
 jsonFile.setStep(jsonFile.getActualStep());
 
 // Write to file, human readable with 2 space indentation
-JsonWriter jsonWriter = new JsonWriter(new File("path/to/file.JSON", true, 2);
+JsonWriter jsonWriter = new JsonWriter(new File("path/to/file.json", true, 2);
 jsonWriter.write(jsonFile);
 jsonWriter.close();
 ```
