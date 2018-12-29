@@ -54,18 +54,18 @@ Java: https://petroware.no/logio/javadoc/index.html
 Example for reading a JSON Well Log file:
 
 ```java
-import no.petroware.logio.json.JsonFile;
+import no.petroware.logio.json.JsonLog;
 import no.petroware.logio.json.JsonReader;
 
 :
 
-// Create a JSON Well Log reader and read to memory
+// Create a JSON Well Log reader and read specified file to memory
 JsonReader jsonReader = new JsonReader(new File("path/to/file.JSON"));
-List<JsonFile> jsonFiles = jsonReader.read(true, false, null);
+List<JsonLog> jsonLogs = jsonReader.read(true, false, null);
 ```
 
-From this point the ```JsonFile``` instance(s) can be navigated to access curves
-and metadata.
+From this point the `JsonLog` instance(s) can be navigated to access curves
+and header data.
 
 If files are larger than physical memory it is possible to process the content
 in a streaming manner by adding a `JsonDataListener` to the `read()` call.
@@ -94,26 +94,26 @@ Example for creating a JSON Well Log file from scratch:
 
 ```java
 import no.petroware.logio.json.JsonCurve;
-import no.petroware.logio.json.JsonFile;
+import no.petroware.logio.json.JsonLog;
 import no.petroware.logio.json.JsonWriter;
 
 :
 
-// Create an empty JSON file instance
-JsonFile jsonFile = new JsonFile();
+// Create an empty JSON log instance
+JsonLog jsonLog = new JsonLog();
 
 // Populate with metadata
-jsonFile.setName("EcoScope Data");
-jsonFile.setWell("35/12-6S");
-jsonFile.setField("Ekofisk");
+jsonLog.setName("EcoScope Data");
+jsonLog.setWell("35/12-6S");
+jsonLog.setField("Ekofisk");
 :
 
 // Create curves
 JsonCurve c1 = new JsonCurve("MD", "Measured depth", "length", "m", Double.class, 1);
-jsonFile.addCurve(c1);
+jsonLog.addCurve(c1);
 
 JsonCurve c2 = new JsonCurve("RES", "Resistivity", "electrical resistivity", "ohm.m", Double.class, 1);
-jsonFile.addCurve(c2);
+jsonLog.addCurve(c2);
 
 // Add curve data
 c1.addValue(1000.0);
@@ -129,22 +129,22 @@ c2.addValue(null);
 c2.addValue(118.871);
 
 // Specify metadata for index
-jsonFile.setStartIndex(jsonFile.getActualStartIndex());
-jsonFile.setEndIndex(jsonFile.getActualEndIndex());
-jsonFile.setStep(jsonFile.getActualStep());
+jsonLog.setStartIndex(jsonLog.getActualStartIndex());
+jsonLog.setEndIndex(jsonLog.getActualEndIndex());
+jsonLog.setStep(jsonLog.getActualStep());
 
 // Write to file, human readable with 2 space indentation
 JsonWriter jsonWriter = new JsonWriter(new File("path/to/file.json", true, 2);
-jsonWriter.write(jsonFile);
+jsonWriter.write(jsonLog);
 jsonWriter.close();
 ```
 
 This will produce the following file:
 
 ```
-{
-  "log": {
-    "metadata": {
+[
+  {
+    "header": {
       "name": "EcoScope Data" ,
       "well": "35/12-6S",
       "field": "Ekofisk",
@@ -179,7 +179,7 @@ This will produce the following file:
       [1349.0, 112.871]
     ]
   }
-}
+]
 ```
 
 
