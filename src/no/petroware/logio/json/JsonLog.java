@@ -17,19 +17,20 @@ import no.petroware.logio.util.ISO8601DateParser;
 import no.petroware.logio.util.Util;
 
 /**
- * Class representing the content of a JSON well log (sub-) file.
+ * Class representing the content of one log.
+ * A log constsis of a header, curve definitions, and curve data.
  *
  * @author <a href="mailto:info@petroware.no">Petroware AS</a>
  */
-public final class JsonFile
+public final class JsonLog
 {
   /**
-   * All the metadata captured as a single JSON object.
+   * The log header data as a single JSON object.
    */
-  private JsonObject metadata_;
+  private JsonObject header_;
 
   /**
-   * The curves of this JSON file.
+   * The curves of this JSON log.
    */
   private final List<JsonCurve> curves_ = new CopyOnWriteArrayList<>();
 
@@ -37,28 +38,28 @@ public final class JsonFile
   private boolean hasCurveData_;
 
   /**
-   * Create a new JSON file instance.
+   * Create a new JSON log instance.
    *
-   * @param hasCurveData  Indicate if the file includes curve data.
+   * @param hasCurveData  Indicate if the log includes curve data.
    */
-  JsonFile(boolean hasCurveData)
+  JsonLog(boolean hasCurveData)
   {
     hasCurveData_ = hasCurveData;
   }
 
   /**
-   * Create an empty JSON well log file.
+   * Create an empty JSON well log.
    */
-  public JsonFile()
+  public JsonLog()
   {
     this(true); // It has all the curve data that exists (none)
 
-    // Default empty metadata
-    metadata_ = Json.createObjectBuilder().build();
+    // Default empty header
+    header_ = Json.createObjectBuilder().build();
   }
 
   /**
-   * Return whether the JSON file instance includes curve data
+   * Return whether the JSON log instance includes curve data
    * or not, i.e if only header data was read or created.
    *
    * @return  True if bulk (curve) data is present, false otherwise.
@@ -69,33 +70,33 @@ public final class JsonFile
   }
 
   /**
-   * Set the metadata of this instance.
+   * Set the header of this instance.
    *
-   * @param metadata  JSON metadata object. Non-null.
+   * @param header  JSON header object. Non-null.
    */
-  void setMetadata(JsonObject metadata)
+  void setHeader(JsonObject header)
   {
-    assert metadata != null : "metadata cannot be null";
+    assert header != null : "header cannot be null";
 
     synchronized (this) {
-      metadata_ = metadata;
+      header_ = header;
     }
   }
 
   /**
-   * Return the metadata of this instance as a single JSON object.
+   * Return the header of this log as a single JSON object.
    *
-   * @return  Metadata of this JSON file. Never null.
+   * @return  Header of this log. Never null.
    */
-  JsonObject getMetadata()
+  JsonObject getHeader()
   {
     synchronized (this) {
-      return metadata_;
+      return header_;
     }
   }
 
   /**
-   * Set a string metadata property of this JSON file.
+   * Set a string header property of this log.
    *
    * @param key    Key of property to set. Non-null.
    * @param value  Associated value. Null to unset.
@@ -107,18 +108,18 @@ public final class JsonFile
       throw new IllegalArgumentException("key cannot be null");
 
     JsonObjectBuilder objectBuilder = Json.createObjectBuilder();
-    metadata_.forEach(objectBuilder::add);
+    header_.forEach(objectBuilder::add);
 
     if (value == null)
       objectBuilder.addNull(key);
     else
       objectBuilder.add(key, value);
 
-    setMetadata(objectBuilder.build());
+    setHeader(objectBuilder.build());
   }
 
   /**
-   * Set a floating point numeric metadata property of this JSON file.
+   * Set a floating point numeric header property of this log.
    *
    * @param key    Key of property to set. Non-null.
    * @param value  Associated value. Null to unset.
@@ -130,18 +131,18 @@ public final class JsonFile
       throw new IllegalArgumentException("key cannot be null");
 
     JsonObjectBuilder objectBuilder = Json.createObjectBuilder();
-    metadata_.forEach(objectBuilder::add);
+    header_.forEach(objectBuilder::add);
 
     if (value == null)
       objectBuilder.addNull(key);
     else
       objectBuilder.add(key, value);
 
-    setMetadata(objectBuilder.build());
+    setHeader(objectBuilder.build());
   }
 
   /**
-   * Set a integer numeric metadata property of this JSON file.
+   * Set a integer numeric header property of this log.
    *
    * @param key    Key of property to set. Non-null.
    * @param value  Associated value. Null to unset.
@@ -153,18 +154,18 @@ public final class JsonFile
       throw new IllegalArgumentException("key cannot be null");
 
     JsonObjectBuilder objectBuilder = Json.createObjectBuilder();
-    metadata_.forEach(objectBuilder::add);
+    header_.forEach(objectBuilder::add);
 
     if (value == null)
       objectBuilder.addNull(key);
     else
       objectBuilder.add(key, value);
 
-    setMetadata(objectBuilder.build());
+    setHeader(objectBuilder.build());
   }
 
   /**
-   * Set a boolean metadata property of this JSON file.
+   * Set a boolean header property of this log.
    *
    * @param key    Key of property to set. Non-null.
    * @param value  Associated value. Null to unset.
@@ -176,18 +177,18 @@ public final class JsonFile
       throw new IllegalArgumentException("key cannot be null");
 
     JsonObjectBuilder objectBuilder = Json.createObjectBuilder();
-    metadata_.forEach(objectBuilder::add);
+    header_.forEach(objectBuilder::add);
 
     if (value == null)
       objectBuilder.addNull(key);
     else
       objectBuilder.add(key, value);
 
-    setMetadata(objectBuilder.build());
+    setHeader(objectBuilder.build());
   }
 
   /**
-   * Set a date metadata property of this JSON file.
+   * Set a date header property of this log.
    *
    * @param key    Key of property to set. Non-null.
    * @param value  Associated value. Null to unset.
@@ -199,18 +200,18 @@ public final class JsonFile
       throw new IllegalArgumentException("key cannot be null");
 
     JsonObjectBuilder objectBuilder = Json.createObjectBuilder();
-    metadata_.forEach(objectBuilder::add);
+    header_.forEach(objectBuilder::add);
 
     if (value == null)
       objectBuilder.addNull(key);
     else
       objectBuilder.add(key, ISO8601DateParser.toString(value));
 
-    setMetadata(objectBuilder.build());
+    setHeader(objectBuilder.build());
   }
 
   /**
-   * Add a LAS type parameter to this JSON file.
+   * Add a LAS type parameter to the header of this log.
    * <p>
    * This method is typically used when converting LAS files to
    * JSON to make sure information is not lost. In general one
@@ -228,7 +229,7 @@ public final class JsonFile
       throw new IllegalArgumentException("lasParameter cannot be null");
 
     JsonObjectBuilder objectBuilder = Json.createObjectBuilder();
-    metadata_.forEach(objectBuilder::add);
+    header_.forEach(objectBuilder::add);
 
     Object value = lasParameter.getValue();
 
@@ -261,13 +262,13 @@ public final class JsonFile
 
     objectBuilder.add(lasParameter.getName(), lasParameterBuilder);
 
-    setMetadata(objectBuilder.build());
+    setHeader(objectBuilder.build());
   }
 
   /**
-   * Return metadata property for the specified key as a <em>LAS parameter</em>.
+   * Return header property for the specified key as a <em>LAS parameter</em>.
    * <p>
-   * This feature is typically used when a JSON file has been converted from LAS.
+   * This feature is typically used when a JSON log has been converted from LAS.
    * See {@link JsonLasParameter} for more information.
    *
    * @param name  Name of LAS parameter to get. Non-null.
@@ -281,7 +282,7 @@ public final class JsonFile
     if (name == null)
       throw new IllegalArgumentException("name cannot be null");
 
-    JsonParser jsonParser = Json.createParserFactory(null).createParser(metadata_);
+    JsonParser jsonParser = Json.createParserFactory(null).createParser(header_);
     jsonParser.next(); // Proceed past the first START_OBJECT
 
     Object object = JsonUtil.findObject(jsonParser, name);
@@ -309,7 +310,7 @@ public final class JsonFile
   }
 
   /**
-   * Add a DLIS type set to this JSON file.
+   * Add a DLIS set type parameter to the header of this log.
    * <p>
    * This method is typically used when converting DLIS files to
    * JSON to make sure information is not lost. In general one
@@ -328,7 +329,7 @@ public final class JsonFile
 
     // Root builder
     JsonObjectBuilder objectBuilder = Json.createObjectBuilder();
-    metadata_.forEach(objectBuilder::add);
+    header_.forEach(objectBuilder::add);
 
     // Attribute builder
     JsonArrayBuilder attributeBuilder = Json.createArrayBuilder();
@@ -351,13 +352,13 @@ public final class JsonFile
 
     objectBuilder.add(dlisSet.getName(), dlisSetBuilder);
 
-    setMetadata(objectBuilder.build());
+    setHeader(objectBuilder.build());
   }
 
   /**
-   * Return metadata property for the specified key as a <em>DLIS set</em>.
+   * Return header property for the specified key as a <em>DLIS set</em>.
    * <p>
-   * This feature is typically used when a JSON file has been converted from DLIS.
+   * This feature is typically used when a JSON log has been converted from DLIS.
    * See {@link JsonDlisSet} for more information.
    *
    * @param name  Name of LAS parameter to get. Non-null.
@@ -377,15 +378,15 @@ public final class JsonFile
   }
 
   /**
-   * Return all the metadata property keys of this JSON file.
+   * Return all the header property keys of this log.
    *
-   * @return  All property keys of this JSON file. Never null.
+   * @return  All property keys of this JSON log. Never null.
    */
   public List<String> getProperties()
   {
     List<String> properties = new ArrayList<>();
 
-    JsonParser jsonParser = Json.createParserFactory(null).createParser(metadata_);
+    JsonParser jsonParser = Json.createParserFactory(null).createParser(header_);
     jsonParser.next(); // Proceed past the first START_OBJECT
 
     while (jsonParser.hasNext()) {
@@ -406,7 +407,7 @@ public final class JsonFile
   }
 
   /**
-   * Return metadata property for the specified key as a string.
+   * Return header property for the specified key as a string.
    *
    * @param key  Key of property to get. Non-null.
    * @return     The associated value as a string. Null if not found, or
@@ -418,7 +419,7 @@ public final class JsonFile
     if (key == null)
       throw new IllegalArgumentException("key cannot be null");
 
-    JsonParser jsonParser = Json.createParserFactory(null).createParser(metadata_);
+    JsonParser jsonParser = Json.createParserFactory(null).createParser(header_);
     jsonParser.next(); // Proceed past the first START_OBJECT
 
     Object object = JsonUtil.findObject(jsonParser, key);
@@ -432,7 +433,7 @@ public final class JsonFile
   }
 
   /**
-   * Return metadata property for the specified key as a double.
+   * Return header property for the specified key as a double.
    *
    * @param key  Key of property to get. Non-null.
    * @return     The associated value as a double. Null if not found, or
@@ -444,7 +445,7 @@ public final class JsonFile
     if (key == null)
       throw new IllegalArgumentException("key cannot be null");
 
-    JsonParser jsonParser = Json.createParserFactory(null).createParser(metadata_);
+    JsonParser jsonParser = Json.createParserFactory(null).createParser(header_);
     jsonParser.next(); // Proceed past the first START_OBJECT
 
     Object object = JsonUtil.findObject(jsonParser, key);
@@ -454,7 +455,7 @@ public final class JsonFile
   }
 
   /**
-   * Return metadata property for the specified key as an integer.
+   * Return header property for the specified key as an integer.
    *
    * @param key  Key of property to get. Non-null.
    * @return     The associated value as an integer. Null if not found, or
@@ -466,7 +467,7 @@ public final class JsonFile
     if (key == null)
       throw new IllegalArgumentException("key cannot be null");
 
-    JsonParser jsonParser = Json.createParserFactory(null).createParser(metadata_);
+    JsonParser jsonParser = Json.createParserFactory(null).createParser(header_);
     jsonParser.next(); // Proceed past the first START_OBJECT
 
     Object object = JsonUtil.findObject(jsonParser, key);
@@ -476,7 +477,7 @@ public final class JsonFile
   }
 
   /**
-   * Return metadata property for the specified key as a boolean.
+   * Return header property for the specified key as a boolean.
    *
    * @param key  Key of property to get. Non-null.
    * @return     The associated value as a boolean. Null if not found, or
@@ -488,7 +489,7 @@ public final class JsonFile
     if (key == null)
       throw new IllegalArgumentException("key cannot be null");
 
-    JsonParser jsonParser = Json.createParserFactory(null).createParser(metadata_);
+    JsonParser jsonParser = Json.createParserFactory(null).createParser(header_);
     jsonParser.next(); // Proceed past the first START_OBJECT
 
     Object object = JsonUtil.findObject(jsonParser, key);
@@ -498,7 +499,7 @@ public final class JsonFile
   }
 
   /**
-   * Return metadata property for the specified key as date.
+   * Return header property for the specified key as date.
    *
    * @param key  Key of property to get. Non-null.
    * @return     The associated value as a date. Null if not found, or
@@ -510,7 +511,7 @@ public final class JsonFile
     if (key == null)
       throw new IllegalArgumentException("key cannot be null");
 
-    JsonParser jsonParser = Json.createParserFactory(null).createParser(metadata_);
+    JsonParser jsonParser = Json.createParserFactory(null).createParser(header_);
     jsonParser.next(); // Proceed past the first START_OBJECT
 
     Object object = JsonUtil.findObject(jsonParser, key);
@@ -520,10 +521,10 @@ public final class JsonFile
   }
 
   /**
-   * Return metadata property for the specified key.
+   * Return header property for the specified key.
    * <p>
    * This is a generic method for clients that add or know about custom content
-   * of the JSON well log file. It is up to the client program to parse the returned
+   * of the JSON well log. It is up to the client program to parse the returned
    * content into the appropriate type.
    *
    * @param key  Key of property to get. Non-null.
@@ -535,7 +536,7 @@ public final class JsonFile
     if (key == null)
       throw new IllegalArgumentException("key cannot be null");
 
-    JsonParser jsonParser = Json.createParserFactory(null).createParser(metadata_);
+    JsonParser jsonParser = Json.createParserFactory(null).createParser(header_);
     jsonParser.next(); // Proceed past the first START_OBJECT
 
     Object object = JsonUtil.findObject(jsonParser, key);
@@ -545,9 +546,9 @@ public final class JsonFile
   }
 
   /**
-   * Return name of the log of this file.
+   * Return name of this log.
    *
-   * @return  Name of the log of this file. Null if none provided.
+   * @return  Name of this log. Null if none provided.
    */
   public String getName()
   {
@@ -555,7 +556,7 @@ public final class JsonFile
   }
 
   /**
-   * Set name of the log of this JSON file.
+   * Set name of this log.
    *
    * @param name  Name to set. Null to unset.
    */
@@ -565,9 +566,9 @@ public final class JsonFile
   }
 
   /**
-   * Get description of the log of this JSON file.
+   * Get description of this log.
    *
-   * @return  Description of the log of this JSON file. Null if none provided.
+   * @return  Description of this log. Null if none provided.
    */
   public String getDescription()
   {
@@ -575,7 +576,7 @@ public final class JsonFile
   }
 
   /**
-   * Set description of the log of this JSON file.
+   * Set description of this log.
    *
    * @param description  Description to set. Null to unset.
    */
@@ -585,9 +586,9 @@ public final class JsonFile
   }
 
   /**
-   * Return well name of the log of this JSON file.
+   * Return well name of this log.
    *
-   * @return  Well name of the log of this JSON file. Null if none provided.
+   * @return  Well name of this log. Null if none provided.
    */
   public String getWell()
   {
@@ -595,7 +596,7 @@ public final class JsonFile
   }
 
   /**
-   * Set well name of the log of this JSON file.
+   * Set well name of this log.
    *
    * @param well  Well name to set. Null to unset.
    */
@@ -605,9 +606,9 @@ public final class JsonFile
   }
 
   /**
-   * Return wellbore name of the log of this JSON file.
+   * Return wellbore name of this log.
    *
-   * @return  Wellbore name of the log of this JSON file. Null if none provided.
+   * @return  Wellbore name of this log. Null if none provided.
    */
   public String getWellbore()
   {
@@ -615,7 +616,7 @@ public final class JsonFile
   }
 
   /**
-   * Set wellbore name of the log of this JSON file.
+   * Set wellbore name of this log.
    *
    * @param wellbore  Wellbore name to set. Null to unset.
    */
@@ -625,9 +626,9 @@ public final class JsonFile
   }
 
   /**
-   * Return field name of the log of this JSON file.
+   * Return field name of this log.
    *
-   * @return  Field name of the log of this JSON file. Null if none provided.
+   * @return  Field name of this log. Null if none provided.
    */
   public String getField()
   {
@@ -635,7 +636,7 @@ public final class JsonFile
   }
 
   /**
-   * Set field name of the log of this JSON file.
+   * Set field name of this log.
    *
    * @param field  Field name to set. Null to unset.
    */
@@ -645,9 +646,9 @@ public final class JsonFile
   }
 
   /**
-   * Return country of the log of this JSON file.
+   * Return country of this log.
    *
-   * @return  Country of the log of this JSON file. Null if none provided.
+   * @return  Country of this log. Null if none provided.
    */
   public String getCountry()
   {
@@ -655,7 +656,7 @@ public final class JsonFile
   }
 
   /**
-   * Set country of the log of this JSON file.
+   * Set country of this log.
    *
    * @param country  Country to set. Null to unset.
    */
@@ -665,9 +666,9 @@ public final class JsonFile
   }
 
   /**
-   * Return logging date of the log of this JSON file.
+   * Return logging date of this log.
    *
-   * @return  Logging date of the log of this JSON file. Null if none provided.
+   * @return  Logging date of this log. Null if none provided.
    */
   public Date getDate()
   {
@@ -675,7 +676,7 @@ public final class JsonFile
   }
 
   /**
-   * Set logging date of the log of this JSON file.
+   * Set logging date of this log.
    *
    * @param date  Logging date to set. Null to unset.
    */
@@ -685,9 +686,9 @@ public final class JsonFile
   }
 
   /**
-   * Return operator name of the log of this JSON file.
+   * Return operator name of this log.
    *
-   * @return  Operator name of the log of this JSON file. Null if none provided.
+   * @return  Operator name of this log. Null if none provided.
    */
   public String getOperator()
   {
@@ -695,9 +696,9 @@ public final class JsonFile
   }
 
   /**
-   * Set operator name of the log of this JSON file.
+   * Set operator name of this log.
    *
-   * @param operator  Operator name of the log of this JSON file. Null to unset.
+   * @param operator  Operator name to set. Null to unset.
    */
   public void setOperator(String operator)
   {
@@ -705,9 +706,9 @@ public final class JsonFile
   }
 
   /**
-   * Return service company name of the log of this JSON file.
+   * Return service company name of this log.
    *
-   * @return  Service company name of the log of this JSON file. Null if none provided.
+   * @return  Service company name of this log. Null if none provided.
    */
   public String getServiceCompany()
   {
@@ -715,9 +716,9 @@ public final class JsonFile
   }
 
   /**
-   * Set service company name of the log of this JSON file.
+   * Set service company name of this log.
    *
-   * @param serviceCompany  Service company name of the log of this JSON file. Null to unset.
+   * @param serviceCompany  Service company name of this log. Null to unset.
    */
   public void setServiceCompany(String serviceCompany)
   {
@@ -725,9 +726,9 @@ public final class JsonFile
   }
 
   /**
-   * Return run number of the log of this JSON file.
+   * Return run number of this log.
    *
-   * @return  Run number of the log of this JSON file. Null if none provided.
+   * @return  Run number of this log. Null if none provided.
    */
   public String getRunNumber()
   {
@@ -735,9 +736,9 @@ public final class JsonFile
   }
 
   /**
-   * Set run number of the log of this JSON file.
+   * Set run number of this log.
    *
-   * @param runNumber  Run number of the log of this JSON file. Null to unset.
+   * @param runNumber  Run number of this log. Null to unset.
    */
   public void setRunNumber(String runNumber)
   {
@@ -745,10 +746,10 @@ public final class JsonFile
   }
 
   /**
-   * Return value type of the index of the log of this JSON file, typically Double.class
+   * Return value type of the index of this log, typically Double.class
    * or Date.class.
    *
-   * @return Value type of the index of the log of this JSON file. Never null.
+   * @return Value type of the index of this log. Never null.
    *         If the log has no curves, Double.class is returned.
    */
   public Class<?> getIndexValueType()
@@ -757,12 +758,12 @@ public final class JsonFile
   }
 
   /**
-   * Return start index of the log of this JSON file.
+   * Return start index of this log.
    * <p>
-   * <b>NOTE: </b> This property is taken from metadata, and may not necessarily
-   * be in accordance with the <em>actual</em> data on the file.
+   * <b>NOTE: </b> This property is taken from the header, and may not
+   * necessarily be in accordance with the <em>actual</em> data of the log.
    *
-   * @return Start index of the log of this JSON file. The type will be according to
+   * @return Start index of this log. The type will be according to
    *         the type of the index curve, @see #getIndexValueType.
    */
   public Object getStartIndex()
@@ -775,9 +776,9 @@ public final class JsonFile
   }
 
   /**
-   * Return the <em>actual</em> start index of the log of this JSON file.
+   * Return the <em>actual</em> start index of this log.
    *
-   * @return  The actual start index. Null if the log has no values.
+   * @return  The actual start index of this log. Null if the log has no values.
    */
   public Object getActualStartIndex()
   {
@@ -787,11 +788,11 @@ public final class JsonFile
   }
 
   /**
-   * Set start index of the log of this JSON file.
+   * Set start index of this log in header.
    *
    * @param startIndex  Start index to set. Null to unset. The type should
    *                    be in accordance with the actual type of the index curve
-   *                    of the file.
+   *                    of the log.
    */
   public void setStartIndex(Object startIndex)
   {
@@ -802,10 +803,10 @@ public final class JsonFile
   }
 
   /**
-   * Return end index of the log of this JSON file.
+   * Return end index of this log.
    * <p>
-   * <b>NOTE: </b> This property is taken from metadata, and may not necessarily
-   * be in accordance with the <em>actual</em> data on the file.
+   * <b>NOTE: </b> This property is taken from header, and may not
+   * necessarily be in accordance with the <em>actual</em> data of the log.
    *
    * @return End index of the log of this JSON file. The type will be according to
    *         the type of the index curve, @see #getIndexValueType.
@@ -820,7 +821,7 @@ public final class JsonFile
   }
 
   /**
-   * Return the <em>actual</em> end index of the log of this JSON file.
+   * Return the <em>actual</em> end index of this log.
    *
    * @return  The actual end index. Null if the log has no values.
    */
@@ -832,11 +833,11 @@ public final class JsonFile
   }
 
   /**
-   * Set end index of the log of this JSON file.
+   * Set end index of this log in the header.
    *
    * @param endIndex  End index to set. Null to unset. The type should
    *                  be in accordance with the actual type of the index curve
-   *                  of the file.
+   *                  of the log.
    */
   public void setEndIndex(Object endIndex)
   {
@@ -847,12 +848,12 @@ public final class JsonFile
   }
 
   /**
-   * Return the regular step of the log of this JSON file.
+   * Return the regular step of this log.
    * <p>
-   * <b>NOTE: </b> This property is taken from metadata, and may not necessarily
-   * be in accordance with the <em>actual</em> data on the file.
+   * <b>NOTE: </b> This property is taken from header, and may not
+   * necessarily be in accordance with the <em>actual</em> data on the file.
    *
-   * @return The step of the index curve of the log of this JSON file.
+   * @return The step of the index curve of this log.
    *         Null should indicate that the log in irregular or the step is unknown.
    */
   public Double getStep()
@@ -861,10 +862,10 @@ public final class JsonFile
   }
 
   /**
-   * Return the <em>actual</em> step of the index curve of this JSON file.
+   * Return the <em>actual</em> step of the index curve of this log.
    *
    * @return  The actual step of the index curve.
-   *          Null if the JSON file has no data or the log set is irregular.
+   *          Null if the log has no data or the log set is irregular.
    */
   public Double getActualStep()
   {
@@ -872,11 +873,11 @@ public final class JsonFile
   }
 
   /**
-   * Set the regular step of the index curve of the log of this JSON file.
+   * Set the regular step of the index curve of this log.
    *
-   * @param step  Step to set. Null to indicate unknown or that the log set is irregular.
-   *              If the log set is time based, the step should as a convention be the number
-   *              of milliseconds between samples.
+   * @param step  Step to set. Null to indicate unknown or that the index is irregular.
+   *              If the log set is time based, the step should be the number
+   *              of <em>milliseconds</em> between samples.
    */
   public void setStep(Double step)
   {
@@ -884,7 +885,7 @@ public final class JsonFile
   }
 
   /**
-   * Add the specified curve to this JSON file.
+   * Add the specified curve to this log.
    *
    * @param curve  Curve to add. Non-null.
    * @throws IllegalArgumentException  If curve is null.
@@ -898,10 +899,10 @@ public final class JsonFile
   }
 
   /**
-   * Return the curves of this JSON file. The first curve
+   * Return the curves of this log. The first curve
    * is by convention always the index curve.
    *
-   * @return  The curves of this JSON file instance. Never null.
+   * @return  The curves of this log. Never null.
    */
   public List<JsonCurve> getCurves()
   {
@@ -911,7 +912,7 @@ public final class JsonFile
   /**
    * Replace the present set of curves.
    * <p>
-   * This method is called by the reader to populate a JsonFile instance
+   * This method is called by the reader to populate a JsonLog instance
    * that initially was read without bulk data.
    *
    * @param curves  Curves to set. Non-null.
@@ -928,9 +929,9 @@ public final class JsonFile
   }
 
   /**
-   * Return the number of curves in this JSON file.
+   * Return the number of curves in this log.
    *
-   * @return  Number of curves in this JSON file. [0,&gt;.
+   * @return  Number of curves in this log. [0,&gt;.
    */
   public int getNCurves()
   {
@@ -938,9 +939,9 @@ public final class JsonFile
   }
 
   /**
-   * Return the number of values in this JSON file.
+   * Return the number of values (per curve) in this log.
    *
-   * @return  Number of curves in this JSON file. [0,&gt;.
+   * @return  Number of values in this log. [0,&gt;.
    */
   public int getNValues()
   {
@@ -948,10 +949,10 @@ public final class JsonFile
   }
 
   /**
-   * Return the index curve of this JSON file.
+   * Return the index curve of this log.
    *
-   * @return  The index curve of this JSON file, or null if the
-   *          JSON file doesn't contain any curves.
+   * @return  The index curve of this log, or null if the
+   *          log doesn't contain any curves.
    */
   public JsonCurve getIndexCurve()
   {
@@ -959,7 +960,7 @@ public final class JsonFile
   }
 
   /**
-   * Clear curve data from all curves of this JSON file.
+   * Clear curve data from all curves of this log.
    */
   public void clearCurves()
   {
@@ -981,7 +982,7 @@ public final class JsonFile
    * Return number of significant digits to use to properly represent
    * the values of the specified curve.
    *
-   * @param curve  JSON curve to consider. Non-null.
+   * @param curve  Curve to consider. Non-null.
    * @return       The number of significant digits to use for the
    *               specified curve. [0,&gt;.
    */
@@ -995,8 +996,8 @@ public final class JsonFile
     if (curve.getNValues() == 0)
       return 0;
 
-    double step = JsonUtil.computeStep(this);
-    if (step == 0.0)
+    Double step = JsonUtil.computeStep(this);
+    if (step == null)
       return 6;
 
     Object[] range = curve.getRange();
@@ -1055,7 +1056,7 @@ public final class JsonFile
     StringBuilder s = new StringBuilder();
     s.append("-- JSON file\n");
 
-    s.append("Metadata:\n");
+    s.append("Header:\n");
     for (String property : getProperties())
       System.out.println(property + ": " + getProperty(property));
 
