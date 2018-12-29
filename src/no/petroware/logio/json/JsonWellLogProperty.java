@@ -16,9 +16,6 @@ public enum JsonWellLogProperty
   /** Well name. */
   WELL("well"),
 
-  /** Unique well ID. */
-  WELL_ID("wellId"),
-
   /** Wellbore name. */
   WELLBORE("wellbore"),
 
