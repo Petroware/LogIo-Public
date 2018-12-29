@@ -18,7 +18,7 @@ import no.petroware.logio.util.Util;
 final class JsonUtil
 {
   /**
-   * Read a JSON array from the current location of the JSON file.
+   * Read a JSON array from the current location of the JSON parser.
    *
    * @param jsonParser  The JSON parser. Non-null.
    * @return  The JSON array builder. Never null.
@@ -78,7 +78,7 @@ final class JsonUtil
   }
 
   /**
-   * Read a JSON array from the current location of the JSON file.
+   * Read a JSON array from the current location of the JSON parser.
    *
    * @param jsonParser  The JSON parser. Non-null.
    * @return  The JSON object builder. Never null.
@@ -217,22 +217,22 @@ final class JsonUtil
   }
 
   /**
-   * Find actual step value of the specified JSON file, being the distance between
+   * Find actual step value of the specified JSON log, being the distance between
    * values in the index curve. Three values are returned: the <em>minimum step</em>,
    * the <em>maximum step</em> and the <em>average step</em>. It is left to the client
    * to decide if these numbers represents a <em>regular</em> or an <em>irregular</em>
    * log set.
    *
-   * @param jsonFile  JSON file to get step from. Non-null.
-   * @return          The (minimum, maximum and average) step value of JSON file.
-   * @throws IllegalArgumentException  If jsonFile is null.
+   * @param log  Log to get step from. Non-null.
+   * @return     The (minimum, maximum and average) step value of the log.
+   * @throws IllegalArgumentException  If log is null.
    */
-  static double[] findStep(JsonFile jsonFile)
+  static double[] findStep(JsonLog log)
   {
-    if (jsonFile == null)
-      throw new IllegalArgumentException("jsonFile");
+    if (log == null)
+      throw new IllegalArgumentException("log");
 
-    List<JsonCurve> curves = jsonFile.getCurves();
+    List<JsonCurve> curves = log.getCurves();
 
     JsonCurve indexCurve = !curves.isEmpty() ? curves.get(0) : null;
     int nValues = indexCurve != null ? indexCurve.getNValues() : 0;
@@ -267,8 +267,8 @@ final class JsonUtil
   }
 
   /**
-   * Based on the index curve, compute the step value of the specified LAS file
-   * as it will be reported in the STEP parameter in the well section.
+   * Based on the index curve, compute the step value of the specified log
+   * as it will be reported in the <em>step</em> metadata.
    * <p>
    * The method uses the {@link JsonUtil#findStep} method to compute min, max and
    * average step, and then compare the largest deviation from the average
@@ -276,16 +276,16 @@ final class JsonUtil
    * If this is within some limit (0.5% currently) the step is considered
    * regular.
    *
-   * @param jsonFile  JSON file to compute step of. Non-null.
-   * @return          The LAS file step value. 0.0 if irregular.
-   * @throws IllegalArgumentException  If lasFile is null.
+   * @param jsonLog  Log to compute step of. Non-null.
+   * @return         The log step value. null if irregular.
+   * @throws IllegalArgumentException  If log is null.
    */
-  public static Double computeStep(JsonFile jsonFile)
+  public static Double computeStep(JsonLog log)
   {
-    if (jsonFile == null)
-      throw new IllegalArgumentException("jsonFile cannot be null");
+    if (log == null)
+      throw new IllegalArgumentException("log cannot be null");
 
-    double[] step = findStep(jsonFile);
+    double[] step = findStep(log);
 
     double minStep = step[0];
     double maxStep = step[1];

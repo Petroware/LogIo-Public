@@ -4,21 +4,21 @@ package no.petroware.logio.json;
  * Provides a mechanism for the client to monitor and process data
  * <em>during</em> a JSON read operation.
  * <p>
- * Convenient for handling JSON files that are larger than physical
- * memory. In this case the client should <em>clear</em> the JSON
- * file instance at fixed intervals:
+ * Convenient for handling JSON content that are larger than physical
+ * memory. In this case the client should <em>clear</em> the log
+ * instance at fixed intervals:
  *
  * <pre>
  *   class DataListener implements JsonDataListener
  *   {
  *      &#64;Override
- *      public void dataRead(JsonFile jsonFile)
+ *      public void dataRead(JsonLog log)
  *      {
  *         // Process log data
  *         :
  *
  *         // Clear curve data to save memory
- *         jsonFile.clearCurves();
+ *         log.clearCurves();
  *      }
  *    }
  * </pre>
@@ -32,12 +32,11 @@ public interface JsonDataListener
    * portion of data has been read into the specified JSON file.
    * <p>
    * After the client has processed the data, it may clean the curve data
-   * in order to save memory storage. See {@link JsonFile#clearCurves}.
+   * in order to save memory storage. See {@link JsonLog#clearCurves}.
    * <p>
    * @see JsonReader#read(boolean,boolean,JsonDataListener)
    *
-   * @param jsonFile  JSON file that has been populated with new data.
-   *                  Never null.
+   * @param log  Log that has been populated with new data. Never null.
    */
-  public void dataRead(JsonFile jsonFile);
+  public void dataRead(JsonLog log);
 }
