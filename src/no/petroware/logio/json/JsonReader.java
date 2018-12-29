@@ -18,31 +18,31 @@ import javax.json.stream.JsonParser;
 import no.petroware.logio.util.Util;
 
 /**
- * Class for reading well logs in the JSON format.
+ * Class for reading well logs specified as JSON Well Log Format.
  * <p>
  * Typical usage:
  *
  * <pre>
  *   JsonReader reader = new JsonReader(new File("path/to/file");
- *   List&lt;JsonFile&gt; jsonFiles = reader.read(true, true, null);
+ *   List&lt;JsonLog&gt; logs = reader.read(true, true, null);
  * </pre>
  * If the curve data is not needed, it is possible to read only the
- * meta-data from the disk file. The curve data may be filled in later:
+ * metadata. The curve data may be filled in later:
  * <br>
  * <br>
  * <pre>
  *   JsonReader reader = new JsonReader(new File("path/to/file"));
- *   List&lt;JsonFile&gt; jsonFiles = reader.read(false, false, null);
+ *   List&lt;JsonLog&gt; logs = reader.read(false, false, null);
  *   :
- *   reader.readData(jsonFiles);
+ *   reader.readData(logs);
  * </pre>
  *
  * Note that even if only meta-data is read, all curve information
  * are properly established as this information comes from metadata.
  * Only the curve <em>values</em> will be missing.
  * <p>
- * If disk files are larger than physical memory, it is possible to
- * <em>stream</em> (process than throw away) the data during read.
+ * If the JSON content is larger than physical memory, it is possible
+ * to <em>stream</em> (process than throw away) the data during read.
  * See {@link JsonDataListener}.
  *
  * @author <a href="mailto:info@petroware.no">Petroware AS</a>
@@ -117,10 +117,10 @@ public final class JsonReader
     if (content != null) {
       String s = new String(content);
 
-      if (!s.contains("\"log\""))
+      if (!s.contains("\"logs\""))
         return 0.0;
 
-      if (s.contains("\"metadata\""))
+      if (s.contains("\"log\""))
         return 0.95;
 
       if (s.contains("\"curves\""))
@@ -131,10 +131,10 @@ public final class JsonReader
   }
 
   /**
-   * Read curve data from the current location in the JSON file.
+   * Read curve data from the current location in the JSON parser.
    *
    * @param jsonParser               The JSON parser. Non-null.
-   * @param jsonFile                 The JSON file to populate with data. Non-null.
+   * @param log                      The log to populate with data. Non-null.
    * @param shouldReadBulkData       True if bulk data should be stored, false if not.
    * @param shouldCaptureStatistics  True to create statistics from the bulk data,
    *                                 false if not.
@@ -142,13 +142,13 @@ public final class JsonReader
    *                                 been read. Null if not used.
    *
    */
-  private static void readData(JsonParser jsonParser, JsonFile jsonFile,
+  private static void readData(JsonParser jsonParser, JsonLog log,
                                boolean shouldReadBulkData,
                                boolean shouldCaptureStatistics,
                                JsonDataListener dataListener)
   {
     assert jsonParser != null : "jsonParser cannot be null";
-    assert jsonFile != null : "jasonFile cannot be null";
+    assert log != null : "log cannot be null";
 
     int curveNo = 0;
     int dimension = 0;
@@ -182,7 +182,7 @@ public final class JsonReader
           dimension = 0;
 
           if (dataListener != null)
-            dataListener.dataRead(jsonFile);
+            dataListener.dataRead(log);
         }
 
         //
@@ -220,7 +220,7 @@ public final class JsonReader
         else if (parseEvent == JsonParser.Event.VALUE_FALSE)
           value = Boolean.FALSE;
 
-        JsonCurve curve = jsonFile.getCurves().get(curveNo);
+        JsonCurve curve = log.getCurves().get(curveNo);
         Class<?> valueType = curve.getValueType();
         nDimensions = curve.getNDimensions();
 
@@ -344,15 +344,15 @@ public final class JsonReader
   }
 
   /**
-   * Read the curves information from the current location of the JSON file.
+   * Read the curves information from the current location of the JSON parser.
    *
    * @param jsonParser  The JSON parser. Non-null.
-   * @param jsonFile    The instance to populate. Non-null.
+   * @param log         The log to populate. Non-null.
    */
-  private static void readCurveDefinitions(JsonParser jsonParser, JsonFile jsonFile)
+  private static void readCurveDefinitions(JsonParser jsonParser, JsonLog log)
   {
     assert jsonParser != null : "jsonParser cannot be null";
-    assert jsonFile != null : "jsonFile cannot be null";
+    assert log != null : "log cannot be null";
 
     while (jsonParser.hasNext()) {
       JsonParser.Event parseEvent = jsonParser.next();
@@ -363,14 +363,14 @@ public final class JsonReader
       if (parseEvent == JsonParser.Event.START_OBJECT) {
         JsonCurve curve = readCurveDefinition(jsonParser);
         if (curve != null)
-          jsonFile.addCurve(curve);
+          log.addCurve(curve);
       }
     }
   }
 
   /**
-   * Read "log" object from the current position in the file
-   * and return as a JsonFile instance.
+   * Read log object from the current position in the JSON parser
+   * and return as a JsonLog instance.
    *
    * @param jsonParser          The parser. Non-null.
    * @param shouldReadBulkData  True if bulk data should be read, false
@@ -381,46 +381,46 @@ public final class JsonReader
    * @return  The read instance. Never null.
    * @throws IOException  If the read operation fails for some reason.
    */
-  private JsonFile readLog(JsonParser jsonParser,
-                           boolean shouldReadBulkData,
-                           boolean shouldCaptureStatistics,
-                           JsonDataListener dataListener)
+  private JsonLog readLog(JsonParser jsonParser,
+                          boolean shouldReadBulkData,
+                          boolean shouldCaptureStatistics,
+                          JsonDataListener dataListener)
     throws IOException
   {
-    JsonFile jsonFile = new JsonFile();
+    JsonLog log = new JsonLog();
 
     while (jsonParser.hasNext()) {
       JsonParser.Event parseEvent = jsonParser.next();
 
       if (parseEvent == JsonParser.Event.END_OBJECT) {
-        jsonFile.trimCurves();
-        return jsonFile;
+        log.trimCurves();
+        return log;
       }
 
       if (parseEvent == JsonParser.Event.KEY_NAME) {
         String key = jsonParser.getString();
 
         //
-        // "metadata"
+        // "header"
         //
-        if (key.equals("metadata")) {
+        if (key.equals("header")) {
           JsonObjectBuilder objectBuilder = JsonUtil.readJsonObject(jsonParser);
-          JsonObject metadata = objectBuilder.build();
-          jsonFile.setMetadata(metadata);
+          JsonObject header = objectBuilder.build();
+          log.setHeader(header);
         }
 
         //
         // "curves"
         //
         if (key.equals("curves")) {
-          readCurveDefinitions(jsonParser, jsonFile);
+          readCurveDefinitions(jsonParser, log);
         }
 
         //
         // "data"
         //
         if (key.equals("data")) {
-          readData(jsonParser, jsonFile,
+          readData(jsonParser, log,
                    shouldReadBulkData,
                    shouldCaptureStatistics,
                    dataListener);
@@ -428,20 +428,20 @@ public final class JsonReader
       }
     }
 
-    throw new IOException("Invalid JSON file: " + (file_ != null ? file_.toString() : inputStream_.toString()));
+    throw new IOException("Invalid JSON content: " + (file_ != null ? file_.toString() : inputStream_.toString()));
   }
 
   /**
-   * Read data from a set of JSON files where the metadata has
-   * already been read. This will preserve the existing JsonFile
-   * structure in case a JSON file is read in two operations:
+   * Read data for a set of JSON logs where the metadata has
+   * already been read. This will preserve the existing JsonLog
+   * structure in case JSON content is read in two operations:
    *
    * <pre>
    *   // Read meta data
-   *   List&lt;JsonFile&gt; jsonFiles = reader.read(false, ...);
+   *   List&lt;JsonLog&gt; logs = reader.read(false, ...);
    *
    *   // Read the curve data
-   *   reader.readData(jsonFiles);
+   *   reader.readData(logs);
    * </pre>
    *
    * There is nothing to gain in performance with this approach
@@ -450,65 +450,65 @@ public final class JsonReader
    *
    * <pre>
    *   // Read metadata
-   *   List&lt;JsonFile&gt; jsonFiles = reader.read(false, ...);
+   *   List&lt;JsonLog&gt; logs = reader.read(false, ...);
    *
    *   // Read all the data
-   *   jsonFiles = reader.read(true, ...);
+   *   logs = reader.read(true, ...);
    * </pre>
    *
-   * @param jsonFiles     The JSON files to populate. These must be the
+   * @param logs          The logs to populate. These must be the
    *                      exact same list as retrieved by calling the
-   *                      #read(false,...) on the same DlisFileReader instance.
+   *                      #read(false,...) on the same JsonFileReader instance.
    *                      Otherwise the behavior is unpredictable.
    * @param shouldCaptureStatistics True to capture statistics per curve during read.
    *                      Statistics capture will reduce read performance slightly,
    *                      so set this to false if the statistics are not needed.
    * @param dataListener  Listener that will be notified when new data has been read.
    *                      Null if not used.
-   * @throws IllegalArgumentException  If jsonFiles is null.
+   * @throws IllegalArgumentException  If logs is null.
    * @throws IOException  If the read operation fails for some reason.
    */
-  public void readData(List<JsonFile> jsonFiles, boolean shouldCaptureStatistics,
+  public void readData(List<JsonLog> logs, boolean shouldCaptureStatistics,
                        JsonDataListener dataListener)
     throws IOException
   {
-    if (jsonFiles == null)
-      throw new IllegalArgumentException("jsonFiles cannot be null");
+    if (logs == null)
+      throw new IllegalArgumentException("logs cannot be null");
 
     // Read everything into a new structure
-    List<JsonFile> newJsonFiles = read(true, shouldCaptureStatistics, dataListener);
+    List<JsonLog> newLogs = read(true, shouldCaptureStatistics, dataListener);
 
     // This is just a simple brain damage check. The client has all possible
     // ways to get into trouble if calling this method with an arbitrary argument.
-    if (newJsonFiles.size() != jsonFiles.size())
-      throw new IllegalArgumentException("The specified JSON files is incompatible with the original");
+    if (newLogs.size() != logs.size())
+      throw new IllegalArgumentException("The specified logs are incompatible with the original");
 
-    // Move the frame data from the new to the existing
-    for (int i = 0; i < jsonFiles.size(); i++) {
-      JsonFile existingJsonFile = jsonFiles.get(i);
-      JsonFile newJsonFile = newJsonFiles.get(i);
+    // Move the log data from the new to the existing
+    for (int i = 0; i < logs.size(); i++) {
+      JsonLog existingLog = logs.get(i);
+      JsonLog newLog = newLogs.get(i);
 
-      existingJsonFile.setCurves(newJsonFile.getCurves());
+      existingLog.setCurves(newLog.getCurves());
     }
   }
 
   /**
-   * Read all logs from the disk file of this reader.
+   * Read all logs from the content of this reader.
    *
    * @param shouldReadBulkData  True if bulk data should be read, false
    *                            if only metadata should be read.
    * @param shouldCaptureStatistics  True if curve statistics should be
    *                            captures, false otherwise,
    * @param dataListener        Client data listener. Null if not used.
-   * @return  List of logs contained in the file. Never null.
+   * @return                    The logs of the JSON stream. Never null.
    * @throws IOException  If the read operation fails for some reason.
    */
-  public List<JsonFile> read(boolean shouldReadBulkData,
-                             boolean shouldCaptureStatistics,
-                             JsonDataListener dataListener)
+  public List<JsonLog> read(boolean shouldReadBulkData,
+                            boolean shouldCaptureStatistics,
+                            JsonDataListener dataListener)
     throws IOException
   {
-    List<JsonFile> jsonFiles = new ArrayList<>();
+    List<JsonLog> logs = new ArrayList<>();
 
     InputStream inputStream = inputStream_ != null ? inputStream_ : new FileInputStream(file_);
     JsonParser jsonParser = Json.createParser(inputStream);
@@ -516,19 +516,15 @@ public final class JsonReader
     while (jsonParser.hasNext()) {
       JsonParser.Event parseEvent = jsonParser.next();
 
-      if (parseEvent == JsonParser.Event.KEY_NAME) {
-        String key = jsonParser.getString();
+      if (parseEvent == JsonParser.Event.END_ARRAY)
+        return logs;
 
-        //
-        // Log
-        //
-        if (key.equals("log")) {
-          JsonFile jsonFile = readLog(jsonParser,
-                                      shouldReadBulkData,
-                                      shouldCaptureStatistics,
-                                      dataListener);
-          jsonFiles.add(jsonFile);
-        }
+      if (parseEvent == JsonParser.Event.START_OBJECT) {
+        JsonLog log = readLog(jsonParser,
+                              shouldReadBulkData,
+                              shouldCaptureStatistics,
+                              dataListener);
+        logs.add(log);
       }
     }
 
@@ -539,6 +535,6 @@ public final class JsonReader
     if (file_ != null)
       inputStream.close();
 
-    return jsonFiles;
+    return logs;
   }
 }

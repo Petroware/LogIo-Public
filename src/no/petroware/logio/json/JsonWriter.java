@@ -30,12 +30,12 @@ import no.petroware.logio.util.Util;
  * Typical usage:
  *
  * <pre>
- *   JsonFile jsonFile = new JsonFile();
+ *   JsonLog log = new JsonLog();
  *   :
  *
  *   // Write to file, human readable with 2 space indentation
  *   JsonWriter writer = new JsonWriter(new File("path/to/file.json"), true, 2);
- *   writer.write(jsonFile);
+ *   writer.write(log);
  *   writer.close();
  * </pre>
  *
@@ -468,23 +468,23 @@ public final class JsonWriter
    * Write the curve data of the specified JSON file to the stream
    * of this writer.
    *
-   * @param jsonFile  JSON file to write curves of. Non-null.
+   * @param log           Log to write curve data of. Non-null.
    * @throws IOException  If the write operation fails for some reason.
    */
-  private void writeData(JsonFile jsonFile)
+  private void writeData(JsonLog log)
     throws IOException
   {
-    assert jsonFile != null : "jsonFile cannot be null";
+    assert log != null : "log cannot be null";
 
     Indentation indentation = indentation_.push().push().push();
 
-    List<JsonCurve> curves = jsonFile.getCurves();
+    List<JsonCurve> curves = log.getCurves();
 
     // Create formatters for each curve
     Map<JsonCurve,Formatter> formatters = new HashMap<>();
-    for (int curveNo = 0; curveNo < jsonFile.getNCurves(); curveNo++) {
+    for (int curveNo = 0; curveNo < log.getNCurves(); curveNo++) {
       JsonCurve curve = curves.get(curveNo);
-      formatters.put(curve, jsonFile.createFormatter(curve, curveNo == 0));
+      formatters.put(curve, log.createFormatter(curve, curveNo == 0));
     }
 
     // Compute column width for each data column
@@ -492,8 +492,8 @@ public final class JsonWriter
     for (JsonCurve curve : curves)
       columnWidths.put(curve, computeColumnWidth(curve, formatters.get(curve)));
 
-    for (int index = 0; index < jsonFile.getNValues(); index++) {
-      for (int curveNo = 0; curveNo < jsonFile.getNCurves(); curveNo++) {
+    for (int index = 0; index < log.getNValues(); index++) {
+      for (int curveNo = 0; curveNo < log.getNCurves(); curveNo++) {
         JsonCurve curve = curves.get(curveNo);
         Class<?> valueType = curve.getValueType();
         int nDimensions = curve.getNDimensions();
@@ -539,7 +539,7 @@ public final class JsonWriter
       }
 
       writer_.write(']');
-      if (index < jsonFile.getNValues() - 1) {
+      if (index < log.getNValues() - 1) {
         writer_.write(',');
         writer_.write(newline_);
       }
@@ -547,20 +547,20 @@ public final class JsonWriter
   }
 
   /**
-   * Write the specified JSON file instances to this writer.
-   * Multiple files can be written in sequence to the same stream.
+   * Write the specified log instances to this writer.
+   * Multiple logs can be written in sequence to the same stream.
    * Additional data can be appended to the last one by {@link #append}.
    * When writing is done, close the writer with {@link #close}.
    *
-   * @param jsonFile  JSON file to write. Non-null.
-   * @throws IllegalArgumentException  If jsonFile is null.
+   * @param log  Log to write. Non-null.
+   * @throws IllegalArgumentException  If log is null.
    * @throws IOException  If the write operation fails for some reason.
    */
-  public void write(JsonFile jsonFile)
+  public void write(JsonLog log)
     throws IOException
   {
-    if (jsonFile == null)
-      throw new IllegalArgumentException("jsonFile cannot be null");
+    if (log == null)
+      throw new IllegalArgumentException("log cannot be null");
 
     boolean isFirstLog = writer_ == null;
 
@@ -568,7 +568,7 @@ public final class JsonWriter
     if (isFirstLog) {
       OutputStream outputStream = file_ != null ? new FileOutputStream(file_) : outputStream_;
       writer_ = new BufferedWriter(new OutputStreamWriter(outputStream, StandardCharsets.UTF_8));
-      writer_.write('{');
+      writer_.write('[');
       writer_.write(newline_);
     }
 
@@ -587,20 +587,18 @@ public final class JsonWriter
     Indentation indentation = indentation_.push();
 
     writer_.write(indentation.toString());
-    writer_.write("\"log\":");
-    writer_.write(spacing_);
     writer_.write('{');
     writer_.write(newline_);
 
     indentation = indentation.push();
 
     //
-    // "metadata"
+    // "header"
     //
     writer_.write(indentation.toString());
-    writer_.write("\"metadata\":");
+    writer_.write("\"header\":");
 
-    JsonParser jsonParser = Json.createParserFactory(null).createParser(jsonFile.getMetadata());
+    JsonParser jsonParser = Json.createParserFactory(null).createParser(log.getHeader());
     jsonParser.next();
     writeObject(jsonParser, indentation.push());
     jsonParser.close();
@@ -616,7 +614,7 @@ public final class JsonWriter
 
     boolean isFirstCurve = true;
 
-    List<JsonCurve> curves = jsonFile.getCurves();
+    List<JsonCurve> curves = log.getCurves();
 
     for (JsonCurve curve : curves) {
 
@@ -699,36 +697,35 @@ public final class JsonWriter
     writer_.write("\"data\": [");
     writer_.write(newline_);
 
-    writeData(jsonFile);
+    writeData(log);
 
-    hasData_ = jsonFile.getNValues() > 0;
+    hasData_ = log.getNValues() > 0;
   }
 
   /**
-   * Append the curve data of the specified JSON file to this
-   * writer.
+   * Append the curve data of the specified log to this writer.
    * <p>
    * This feature can be used to <em>stream</em> data to a JSON
-   * destination. By repeatedly clearing and populating the JSON
-   * file curves with new data there is no need for the client to
+   * destination. By repeatedly clearing and populating the log
+   * curves with new data there is no need for the client to
    * keep the full volume in memory at any point in time.
    * <p>
    * <b>NOTE:</b> This method should be called after the JSON meta
-   * data has been written (see {@link #write}), and the JSON file must be
-   * compatible with this.
+   * data has been written (see {@link #write}), and the JSON log
+   * must be compatible with this.
    * <p>
    * When writing is done, close the stream with {@link #close}.
    *
-   * @param jsonFile  JSON file of data append to stream. Non-null.
-   * @throws IllegalArgumentException  If jsonFile is null.
+   * @param log   Log to append to stream. Non-null.
+   * @throws IllegalArgumentException  If log is null.
    * @throws IllegalStateException     If the writer is not open for writing.
    * @throws IOException  If the write operation fails for some reason.
    */
-  public void append(JsonFile jsonFile)
+  public void append(JsonLog log)
     throws IOException
   {
-    if (jsonFile == null)
-      throw new IllegalArgumentException("jsonFile cannot be null");
+    if (log == null)
+      throw new IllegalArgumentException("log cannot be null");
 
     if (writer_ == null)
       throw new IllegalStateException("Writer is not open");
@@ -739,9 +736,9 @@ public final class JsonWriter
     }
 
     writer_.write(indentation_.toString());
-    writeData(jsonFile);
+    writeData(log);
 
-    if (!hasData_ && jsonFile.getNValues() > 0)
+    if (!hasData_ && log.getNValues() > 0)
       hasData_ = true;
   }
 
@@ -768,8 +765,8 @@ public final class JsonWriter
     writer_.write('}');
     writer_.write(newline_);
 
-    // Complete the JSON object
-    writer_.write('}');
+    // Complete the logs array
+    writer_.write(']');
     writer_.write(newline_);
 
     writer_.close();
@@ -777,21 +774,21 @@ public final class JsonWriter
   }
 
   /**
-   * Convenience method for writing the content of the specified JSON
-   * files to a string.
+   * Convenience method for writing the content of the specified logs
+   * to a string.
    *
-   * @param jsonFiles    JSON files to write. Non-null.
+   * @param logs         Logs to write. Non-null.
    * @param isPretty     True to write in human readable pretty format, false
    *                     to write as dense as possible.
    * @param indentation  The white space indentation used in pretty print mode. [0,&gt;.
    *                     If isPretty is false, this setting has no effect.
    * @return             The requested string. Never null.
-   * @throws IllegalArgumentException  If jsonFiles is null or indentation is out of bounds.
+   * @throws IllegalArgumentException  If logs is null or indentation is out of bounds.
    */
-  public static String toString(List<JsonFile> jsonFiles, boolean isPretty, int indentation)
+  public static String toString(List<JsonLog> logs, boolean isPretty, int indentation)
   {
-    if (jsonFiles == null)
-      throw new IllegalArgumentException("jsonFiles cannot be null");
+    if (logs == null)
+      throw new IllegalArgumentException("logs cannot be null");
 
     if (indentation < 0)
       throw new IllegalArgumentException("invalid indentation: " + indentation);
@@ -802,8 +799,8 @@ public final class JsonWriter
     String string = "";
 
     try {
-      for (JsonFile jsonFile : jsonFiles)
-        writer.write(jsonFile);
+      for (JsonLog log : logs)
+        writer.write(log);
     }
     catch (IOException exception) {
       // Since we are writing to memory (ByteArrayOutputStream) we don't really
@@ -825,43 +822,43 @@ public final class JsonWriter
   }
 
   /**
-   * Convenience method for writing the content of the specified JSON
-   * file to a string.
+   * Convenience method for writing the content of the specified log
+   * to a string.
    *
-   * @param jsonFile     JSON files to write. Non-null.
+   * @param log          Log to write. Non-null.
    * @param isPretty     True to write in human readable pretty format, false
    *                     to write as dense as possible.
    * @param indentation  The white space indentation used in pretty print mode. [0,&gt;.
    *                     If isPretty is false, this setting has no effect.
    * @return             The requested string. Never null.
-   * @throws IllegalArgumentException  If jsonFile is null or indentation is out of bounds.
+   * @throws IllegalArgumentException  If log is null or indentation is out of bounds.
    */
-  public static String toString(JsonFile jsonFile, boolean isPretty, int indentation)
+  public static String toString(JsonLog log, boolean isPretty, int indentation)
   {
-    if (jsonFile == null)
-      throw new IllegalArgumentException("jsonFile cannot be null");
+    if (log == null)
+      throw new IllegalArgumentException("log cannot be null");
 
     if (indentation < 0)
       throw new IllegalArgumentException("invalid indentation: " + indentation);
 
-    List<JsonFile> jsonFiles = new ArrayList<>();
-    jsonFiles.add(jsonFile);
-    return toString(jsonFiles, isPretty, indentation);
+    List<JsonLog> logs = new ArrayList<>();
+    logs.add(log);
+    return toString(logs, isPretty, indentation);
   }
 
   /**
-   * Convenience method for writing the content of the specified JSON
-   * file to a pretty printed string.
+   * Convenience method for writing the content of the specified log
+   * to a pretty printed string.
    *
-   * @param jsonFile  JSON files to write. Non-null.
-   * @return          The requested string. Never null.
-   * @throws IllegalArgumentException  If jsonFile is null.
+   * @param log  Log to write. Non-null.
+   * @return     The requested string. Never null.
+   * @throws IllegalArgumentException  If log is null.
    */
-  public static String toString(JsonFile jsonFile)
+  public static String toString(JsonLog log)
   {
-    if (jsonFile == null)
-      throw new IllegalArgumentException("jsonFile cannot be null");
+    if (log == null)
+      throw new IllegalArgumentException("log cannot be null");
 
-    return toString(jsonFile, true, 2);
+    return toString(log, true, 2);
   }
 }

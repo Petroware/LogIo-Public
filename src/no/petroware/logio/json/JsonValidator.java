@@ -34,8 +34,11 @@ import no.petroware.logio.util.ISO8601DateParser;
  *
  * @author <a href="mailto:info@petroware.no">Petroware AS</a>
  */
-public final class JsonValidator
+public enum JsonValidator
 {
+  /** The sole instance of this class. */
+  instance;
+
   /**
    * Represents the different message types created during validation.
    *
@@ -148,9 +151,6 @@ public final class JsonValidator
   /** File listing the valid Energistics units. */
   private final static String UNITS_FILE = "units.txt";
 
-  /** The sole instance of this class. */
-  private final static JsonValidator instance_ = new JsonValidator();
-
   /** List of valid Energistics units, mapped on quantity. */
   private final Map<String,List<String>> validUnits_ = new HashMap<>();
 
@@ -161,7 +161,7 @@ public final class JsonValidator
    */
   public static JsonValidator getInstance()
   {
-    return instance_;
+    return instance;
   }
 
   /**
@@ -225,15 +225,15 @@ public final class JsonValidator
    * i.e. that all curves and dimensions have the same number
    * of values.
    *
-   * @param jsonFile  JSON file to check. Non-null.
-   * @return          True if the JSON file is aligned, false otherwise.
+   * @param log  Log to check. Non-null.
+   * @return     True if the log is aligned, false otherwise.
    */
-  private static boolean isAligned(JsonFile jsonFile)
+  private static boolean isAligned(JsonLog log)
   {
-    assert jsonFile != null : "jsonFile cannot be null";
+    assert log != null : "log cannot be null";
 
-    int nValues = jsonFile.getNValues();
-    for (JsonCurve curve : jsonFile.getCurves()) {
+    int nValues = log.getNValues();
+    for (JsonCurve curve : log.getCurves()) {
       for (int dimension = 0; dimension < curve.getNDimensions(); dimension++)
         if (curve.getNValues(dimension) != nValues)
           return false;
@@ -243,34 +243,34 @@ public final class JsonValidator
   }
 
   /**
-   * Validate the index range given in the metadata of the specified JSON file
+   * Validate the index range given in the header of the specified log
    * against the actual ones captured from the data section.
    *
-   * @param jsonFile          JSON file holding metadata. Non-null.
+   * @param log               Log of header to validate. Non-null.
    * @param actualStartIndex  Actual start index from file. Null if no data.
    * @param actualEndIndex    Actual end index from file. Null if no data.
    * @param minStep           Minimum step encountered in the actual data. Null if no data.
    * @param maxStep           Maximum step encountered in the actual data. Null if no data.
    * @param messages          Validation messages to append to. Non-null.
    */
-  private static void validateIndex(JsonFile jsonFile,
+  private static void validateIndex(JsonLog log,
                                     Double actualStartIndex, Double actualEndIndex, Double minStep, Double maxStep,
                                     List<Message> messages)
   {
-    assert jsonFile != null : "jsonFile cannot be null";
+    assert log != null : "log cannot be null";
     assert messages != null : "messages cannot be null";
 
-    Class<?> valueType = jsonFile.getIndexValueType();
+    Class<?> valueType = log.getIndexValueType();
 
     // Compute actual step as average of min and max step
     Double actualStep = minStep != null ? (minStep + maxStep) / 2.0 : null;
     if (actualStep != null && minStep != null && Math.abs(actualStep - minStep) > 0.001)
       actualStep = null;
 
-    // Find start/end/step from metadata represented as double value
-    double startIndex = Util.getAsDouble(jsonFile.getStartIndex());
-    double endIndex = Util.getAsDouble(jsonFile.getEndIndex());
-    double step = Util.getAsDouble(jsonFile.getStep());
+    // Find start/end/step from header represented as double value
+    double startIndex = Util.getAsDouble(log.getStartIndex());
+    double endIndex = Util.getAsDouble(log.getEndIndex());
+    double step = Util.getAsDouble(log.getStep());
 
     //
     // Start index
@@ -329,22 +329,22 @@ public final class JsonValidator
    * the specified JSON file instance.
    *
    * @param jsonParser  JSON parser. Non-null.
-   * @param jsonFile    JSON file with curve definitions.
+   * @param log         Log with curve definitions.
    * @param messages    Validation messages to append to. Non-null.
    * @throws JsonParsingException  If the data object is invalid for some reason.
    */
-  private static void validateData(JsonParser jsonParser, JsonFile jsonFile, List<Message> messages)
+  private static void validateData(JsonParser jsonParser, JsonLog log, List<Message> messages)
     throws JsonParsingException
   {
     assert jsonParser != null : "jsonParser cannot be null";
-    assert jsonFile != null : "jasonFile cannot be null";
+    assert log != null : "log cannot be null";
     assert messages != null : "messages cannot be null";
 
     int curveNo = 0;
     int dimension = 0;
     int nDimensions = 1;
 
-    int nCurves = jsonFile.getNCurves();
+    int nCurves = log.getNCurves();
     int level = 0;
 
     Double startIndex = null;
@@ -366,10 +366,10 @@ public final class JsonValidator
         level--;
 
         //
-        // If we get to level 0 we are all done. Validate the metadata index
+        // If we get to level 0 we are all done. Validate the header index
         //
         if (level == 0) {
-          validateIndex(jsonFile, startIndex, endIndex, minStep, maxStep, messages);
+          validateIndex(log, startIndex, endIndex, minStep, maxStep, messages);
           return;
         }
 
@@ -377,13 +377,13 @@ public final class JsonValidator
         // If at level 1 we have reached end of one row
         //
         if (level == 1) {
-          boolean isAligned = isAligned(jsonFile);
+          boolean isAligned = isAligned(log);
           if (!isAligned)
             throw new JsonParsingException("Invalid number of data", jsonParser.getLocation());
           curveNo = 0;
           dimension = 0;
 
-          jsonFile.clearCurves(); // We don't need the data
+          log.clearCurves(); // We don't need the data
         }
 
         //
@@ -430,7 +430,7 @@ public final class JsonValidator
                                          jsonParser.getLocation());
         }
 
-        JsonCurve curve = jsonFile.getCurves().get(curveNo);
+        JsonCurve curve = log.getCurves().get(curveNo);
         Class<?> valueType = curve.getValueType();
         nDimensions = curve.getNDimensions();
 
@@ -479,15 +479,15 @@ public final class JsonValidator
    * the specified JSON file instance.
    *
    * @param jsonParser  JSON parser. Non-null.
-   * @param jsonFile    JSON file to append curve definitions to. Non-null.
+   * @param log         Log to append curve definitions to. Non-null.
    * @param messages    Validation messages to append to. Non-null.
    * @throws JsonParsingException  If the data object is invalid for some reason.
    */
-  private void validateCurveDefinition(JsonParser jsonParser, JsonFile jsonFile, List<Message> messages)
+  private void validateCurveDefinition(JsonParser jsonParser, JsonLog log, List<Message> messages)
     throws JsonParsingException
   {
     assert jsonParser != null : "jsonParser cannot be null";
-    assert jsonFile != null : "jsonFile cannot be null";
+    assert log != null : "log cannot be null";
     assert messages != null : "messages cannot be null";
 
     String curveName = null;
@@ -505,12 +505,12 @@ public final class JsonValidator
       // Wrap up the curve definition and add to the file instance
       //
       if (parseEvent == JsonParser.Event.END_OBJECT) {
-        boolean isIndexCurve = jsonFile.getNCurves() == 0;
+        boolean isIndexCurve = log.getNCurves() == 0;
 
         // Check that curve name is present
         if (curveName == null) {
           messages.add(new Message(Message.Level.SEVERE, jsonParser.getLocation(),
-                                   "Curve name is missing for curve " + jsonFile.getNCurves() + "."));
+                                   "Curve name is missing for curve " + log.getNCurves() + "."));
           curveName = "curve"; // Use this to we can get on with the validation
         }
 
@@ -564,7 +564,7 @@ public final class JsonValidator
         JsonCurve curve = new JsonCurve(curveName, description,
                                         quantity, unit, valueType,
                                         nDimensions);
-        jsonFile.addCurve(curve);
+        log.addCurve(curve);
         return;
       }
 
@@ -644,15 +644,15 @@ public final class JsonValidator
    * in the parsing process.
    *
    * @param jsonParser  JSON parser. Non-null.
-   * @param jsonFile    JSON file we are populating. Non-null.
-   * @param messages      Validation messages to append to. Non-null.
+   * @param log         Log being populated. Non-null.
+   * @param messages    Validation messages to append to. Non-null.
    * @throws JsonParsingException  If the parsing fails for some reason.
    */
-  private void validateCurveDefinitions(JsonParser jsonParser, JsonFile jsonFile, List<Message> messages)
+  private void validateCurveDefinitions(JsonParser jsonParser, JsonLog log, List<Message> messages)
     throws JsonParsingException
   {
     assert jsonParser != null : "jsonParser cannot be null";
-    assert jsonFile != null : "jsonFile cannot be null";
+    assert log != null : "log cannot be null";
     assert messages != null : "message cannot be null";
 
     while (jsonParser.hasNext()) {
@@ -662,7 +662,7 @@ public final class JsonValidator
         return;
 
       else if (parseEvent == JsonParser.Event.START_OBJECT) {
-        validateCurveDefinition(jsonParser, jsonFile, messages);
+        validateCurveDefinition(jsonParser, log, messages);
       }
 
       else if (parseEvent != JsonParser.Event.START_ARRAY) {
@@ -673,18 +673,18 @@ public final class JsonValidator
   }
 
   /**
-   * Validate the metadata of the specified JSON file.
+   * Validate the header of the specified log.
    *
-   * @param jsonFile  JSON file to validate. Non-null.
+   * @param log       Log of header to validate. Non-null.
    * @param messages  Validation messages to append to. Non-null.
    */
-  private static void validateMetadata(JsonFile jsonFile, List<Message> messages)
+  private static void validateHeader(JsonLog log, List<Message> messages)
   {
-    assert jsonFile != null : "jsonFile cannot be null";
+    assert log != null : "log cannot be null";
     assert messages != null : "messages cannot be null";
 
     // Get the properties that are there
-    List<String> actualProperties = jsonFile.getProperties();
+    List<String> actualProperties = log.getProperties();
 
     List<String> wellKnownProperties = new ArrayList<>();
     for (JsonWellLogProperty wellKnownProperty : JsonWellLogProperty.values())
@@ -703,7 +703,7 @@ public final class JsonValidator
     }
 
     // Check date specifically
-    String dateString = jsonFile.getPropertyAsString("date");
+    String dateString = log.getPropertyAsString("date");
     if (dateString != null && !dateString.isEmpty()) {
       try {
         ISO8601DateParser.parse(dateString);
@@ -717,52 +717,69 @@ public final class JsonValidator
   /**
    * Validate the log object at the current position in the JSON parser.
    *
-   * @param jsonParser    The parser. Non-null.
-   * @param messages      Validation messages to append to. Non-null.
+   * @param jsonParser  The parser. Non-null.
+   * @param messages    Validation messages to append to. Non-null.
+   * @return            The log found at the given location, or null if none.
    * @throws IOException  If the read operation fails for some reason.
    * @throws JsonParsingException  If the content is not valid JSON.
    */
-  private void validateLog(JsonParser jsonParser, List<Message> messages)
+  private JsonLog validateLog(JsonParser jsonParser, List<Message> messages)
     throws IOException, JsonParsingException
   {
     assert jsonParser != null : "jsonParser cannot be null";
     assert messages != null : "messages cannot be null";
 
-    JsonFile jsonFile = new JsonFile();
+    JsonLog log = new JsonLog();
+
+    boolean hasHeader = false;
+
+    JsonLocation location = jsonParser.getLocation();
 
     while (jsonParser.hasNext()) {
       JsonParser.Event parseEvent = jsonParser.next();
 
       if (parseEvent == JsonParser.Event.END_OBJECT) {
-        return;
+        String name = log.getName();
+        int nCurves = log.getNCurves();
+
+        if (nCurves > 0 || hasHeader) {
+          messages.add(new Message(Message.Level.INFO, location,
+                                   "Log \"" + name + "\" found. " + nCurves + " curves."));
+          return log;
+        }
+
+        // Found some JSON stuff, but nothing that looks like a log
+        return null;
       }
 
       if (parseEvent == JsonParser.Event.KEY_NAME) {
         String key = jsonParser.getString();
 
         //
-        // "metadata"
+        // "header"
         //
-        if (key.equals("metadata")) {
+        if (key.equals("header")) {
           JsonObjectBuilder objectBuilder = JsonUtil.readJsonObject(jsonParser);
-          JsonObject metadata = objectBuilder.build();
-          jsonFile.setMetadata(metadata);
+          JsonObject header = objectBuilder.build();
+          log.setHeader(header);
 
-          validateMetadata(jsonFile, messages);
+          validateHeader(log, messages);
+
+          hasHeader = true;
         }
 
         //
         // "curves"
         //
         else if (key.equals("curves")) {
-          validateCurveDefinitions(jsonParser, jsonFile, messages);
+          validateCurveDefinitions(jsonParser, log, messages);
         }
 
         //
         // "data"
         //
         else if (key.equals("data")) {
-          validateData(jsonParser, jsonFile, messages);
+          validateData(jsonParser, log, messages);
         }
 
         //
@@ -774,6 +791,9 @@ public final class JsonValidator
         }
       }
     }
+
+    // No valid log found
+    return null;
   }
 
   /**
@@ -814,30 +834,23 @@ public final class JsonValidator
 
     assert jsonParser != null : "jsonParser cannot be null here";
 
-    boolean hasTopLevelTag = false;
+    boolean isArray = false;
+    boolean hasLogs = false;
 
     try {
       while (jsonParser.hasNext()) {
         JsonParser.Event parseEvent = jsonParser.next();
 
-        if (parseEvent == JsonParser.Event.KEY_NAME) {
-          String key = jsonParser.getString();
+        if (parseEvent == JsonParser.Event.START_ARRAY)
+          isArray = true;
 
-          //
-          // Log
-          //
-          if (key.equals("log")) {
-            hasTopLevelTag = true;
-            validateLog(jsonParser, messages);
-          }
+        if (parseEvent == JsonParser.Event.END_ARRAY)
+          return messages;
 
-          //
-          // Others
-          //
-          else {
-            messages.add(new Message(Message.Level.WARNING, jsonParser.getLocation(),
-                                     "Unrecognized top level element \"" + key + "\". Ignored."));
-          }
+        if (parseEvent == JsonParser.Event.START_OBJECT && isArray) {
+          JsonLog log = validateLog(jsonParser, messages);
+          if (log != null)
+            hasLogs = true;
         }
       }
     }
@@ -849,9 +862,8 @@ public final class JsonValidator
       jsonParser.close();
     }
 
-    if (!hasTopLevelTag)
-      messages.add(new Message(Message.Level.WARNING, null,
-                               "Top level log tag is missing."));
+    if (!hasLogs)
+      messages.add(new Message(Message.Level.INFO, jsonParser.getLocation(), "No logs found."));
 
     return messages;
   }
