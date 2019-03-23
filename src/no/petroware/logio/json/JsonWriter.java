@@ -9,7 +9,6 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
-import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Date;
@@ -17,15 +16,17 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import javax.json.Json;
-import javax.json.stream.JsonParser;
+import javax.json.JsonArray;
+import javax.json.JsonObject;
+import javax.json.JsonString;
+import javax.json.JsonValue;
 
 import no.petroware.logio.util.Formatter;
 import no.petroware.logio.util.ISO8601DateParser;
 import no.petroware.logio.util.Util;
 
 /**
- * Class for writing JSON files to disk.
+ * Class for writing JSON Well Log Format files to disk.
  * <p>
  * Typical usage:
  *
@@ -44,7 +45,7 @@ import no.petroware.logio.util.Util;
  * file alternately, see {@link #append}.
  * <p>
  * Note that the pretty print mode of this writer will behave different than
- * a standard JSON writer in that it writes curve data arrays horizontally
+ * a standard JSON writer in that it always writes curve data arrays horizontally,
  * with each curve vertically aligned.
  *
  * @author <a href="mailto:info@petroware.no">Petroware AS</a>
@@ -143,7 +144,7 @@ public final class JsonWriter
   }
 
   /**
-   * Create a JSON writer instance.
+   * Create a JSON Well Log Format writer instance.
    *
    * @param outputStream  Stream to write. Non-null.
    * @param isPretty      True to write in human readable pretty format, false
@@ -169,7 +170,7 @@ public final class JsonWriter
   }
 
   /**
-   * Create a JSON writer instance.
+   * Create a JSON Well Log Format writer instance.
    *
    * @param file         Disk file to write to. Non-null.
    * @param isPretty     True to write in human readable pretty format, false
@@ -195,12 +196,23 @@ public final class JsonWriter
   }
 
   /**
-   * Compute the width of the widest element of the column of the specified
-   * curve data.
+   * Create a JSON Well Log Format writer producing pretty content with
+   * standard indentation.
+   *
+   * @param file  Disk file to write to. Non-null.
+   * @throws IllegalArgumentException  If file is null.
+   */
+  public JsonWriter(File file)
+  {
+    this(file, true, 2);
+  }
+
+  /**
+   * Compute the width of the widest element of the column of the specified curve.
    *
    * @param curve      Curve to compute column width of. Non-null.
    * @param formatter  Curve data formatter. Null if N/A for the specified curve.
-   * @return Width of widest element of the curve. [0,&gt;.
+   * @return           Width of widest element of the curve. [0,&gt;.
    */
   private static int computeColumnWidth(JsonCurve curve, Formatter formatter)
   {
@@ -213,7 +225,7 @@ public final class JsonWriter
       for (int dimension = 0; dimension < curve.getNDimensions(); dimension++) {
         Object value = curve.getValue(dimension, index);
 
-        String text = "";
+        String text;
 
         if (value == null)
           text = "null";
@@ -252,8 +264,7 @@ public final class JsonWriter
 
   /**
    * Get the specified data value as text, according to the specified value type,
-   * the curve formmatter, the curve width and the general rules for the JSON
-   * format.
+   * the curve formatter, the curve width and the general rules for the JSON format.
    *
    * @param value      Curve value to get as text. May be null, in case "null" is returned.
    * @param valueType  Java value type of the curve of the value. Non-null.
@@ -261,7 +272,7 @@ public final class JsonWriter
    * @param width      Total with set aside for the values of this column. [0,&gt;.
    * @return           The JSON token to be written to file. Never null.
    */
-  private static String getText(Object value, Class<?> valueType, Formatter formatter, int width)
+  private String getText(Object value, Class<?> valueType, Formatter formatter, int width)
   {
     assert valueType != null : "valueType cannot be null";
     assert width >= 0 : "Invalid width: " + width;
@@ -281,191 +292,213 @@ public final class JsonWriter
     else
       text = value.toString();
 
-    String padding = Util.getSpaces(width - text.length());
+    String padding = isPretty_ ? Util.getSpaces(width - text.length()) : "";
     return padding + text;
   }
 
   /**
-   * Write the array at the current position of the specified JSON parser
-   * to the destination.
+   * Write the specified JSON value to the current writer.
    *
-   * @param jsonParser   The JSON parser holding the object to write. Non-null.
-   * @param indentation  Current file indentation. Non-null.
-   * @throws IOException  If the write operation fails for some reason.
+   * @param jsonValue    Value to write. Non-null.
+   * @param indentation  The current indentation level. Non-null.
    */
-  private void writeArray(JsonParser jsonParser, Indentation indentation)
+  private void writeValue(JsonValue jsonValue, Indentation indentation)
     throws IOException
   {
-    assert jsonParser != null : "jsonParser cannot be null";
-    assert indentation != null : "indentation cannot be null";
+    assert jsonValue != null : "jsonValue cannot be null";
+    assert indentation != null : "indentation cannot b3 null";
 
-    writer_.write(spacing_);
-    writer_.write('[');
-    writer_.write(newline_);
+    switch (jsonValue.getValueType()) {
+      case ARRAY :
+        writeArray((JsonArray) jsonValue, indentation);
+        break;
 
-    boolean isFirst = true;
+      case OBJECT :
+        writeObject((JsonObject) jsonValue, indentation);
+        break;
 
-    while (jsonParser.hasNext()) {
-      JsonParser.Event parseEvent = jsonParser.next();
+      case NUMBER :
+        writer_.write(jsonValue.toString());
+        break;
 
-      if (parseEvent == JsonParser.Event.KEY_NAME) {
-        assert false : "Invalid state";
-      }
+      case STRING :
+        writer_.write('\"');
+        writer_.write(((JsonString) jsonValue).getString());
+        writer_.write('\"');
+        break;
 
-      else if (parseEvent == JsonParser.Event.START_OBJECT) {
-        writeObject(jsonParser, indentation.push());
-        isFirst = false;
-      }
-
-      else if (parseEvent == JsonParser.Event.END_OBJECT) {
-        assert false : "Invalid state";
-      }
-
-      else if (parseEvent == JsonParser.Event.START_ARRAY) {
-        writeArray(jsonParser, indentation.push());
-      }
-
-      else if (parseEvent == JsonParser.Event.END_ARRAY) {
-        writer_.write(']');
-        return;
-      }
-
-      else if (parseEvent == JsonParser.Event.VALUE_FALSE) {
-        if (!isFirst)
-          writer_.write("," + newline_);
-        writer_.write(indentation.toString());
+      case FALSE :
         writer_.write("false");
-        isFirst = false;
-      }
+        break;
 
-      else if (parseEvent == JsonParser.Event.VALUE_TRUE) {
-        if (!isFirst)
-          writer_.write("," + newline_);
-        writer_.write(indentation.toString());
+      case TRUE :
         writer_.write("true");
-        isFirst = false;
-      }
+        break;
 
-      else if (parseEvent == JsonParser.Event.VALUE_NULL) {
-        if (!isFirst)
-          writer_.write("," + newline_);
-        writer_.write(indentation.toString());
+      case NULL :
         writer_.write("null");
-        isFirst = false;
-      }
+        break;
 
-      else if (parseEvent == JsonParser.Event.VALUE_NUMBER) {
-        if (!isFirst)
-          writer_.write("," + newline_);
-        writer_.write(indentation.toString());
-        BigDecimal value = jsonParser.getBigDecimal();
-        writer_.write(value.toString());
-        isFirst = false;
-      }
-
-      else if (parseEvent == JsonParser.Event.VALUE_STRING) {
-        if (!isFirst)
-          writer_.write("," + newline_);
-        writer_.write(indentation.toString());
-        String value = jsonParser.getString();
-        writer_.write(value);
-        isFirst = false;
-      }
+      default :
+        assert false : "Unrecognized value type: " + jsonValue.getValueType();
     }
   }
 
   /**
-   * Write the object at the current position of the specified JSON parser
-   * to the destination.
+   * Write the specified JSON object to the current writer.
    *
-   * @param jsonParser   The JSON parser holding the object to write. Non-null.
-   * @param indentation  Current file indentation. Non-null.
-   * @throws IOException  If the write operation fails for some reason.
+   * @param jsonObject   Object to write. Non-null.
+   * @param indentation  The current indentation level. Non-null.
    */
-  private void writeObject(JsonParser jsonParser, Indentation indentation)
+  private void writeObject(JsonObject jsonObject, Indentation indentation)
     throws IOException
   {
-    assert jsonParser != null : "jsonParser cannot be null";
+    assert jsonObject != null : "jsonObject cannot be null";
     assert indentation != null : "indentation cannot be null";
 
-    writer_.write(spacing_);
     writer_.write('{');
-    writer_.write(newline_);
 
     boolean isFirst = true;
 
-    while (jsonParser.hasNext()) {
-      JsonParser.Event parseEvent = jsonParser.next();
+    for (Map.Entry<String,JsonValue> entry : jsonObject.entrySet()) {
+      String key = entry.getKey();
+      JsonValue value = entry.getValue();
 
-      if (parseEvent == JsonParser.Event.KEY_NAME) {
-        String key = jsonParser.getString();
+      if (!isFirst)
+        writer_.write(',');
 
-        if (!isFirst) {
-          writer_.write(',');
-          writer_.write(newline_);
-        }
+      writer_.write(newline_);
+      writer_.write(indentation.push().toString());
+      writer_.write('\"');
+      writer_.write(key);
+      writer_.write('\"');
+      writer_.write(':');
+      writer_.write(spacing_);
 
-        writer_.write(indentation.toString());
-        writer_.write('\"');
-        writer_.write(key);
-        writer_.write('\"');
-        writer_.write(':');
-        isFirst = false;
-      }
+      writeValue(value, indentation.push());
 
-      else if (parseEvent == JsonParser.Event.START_OBJECT) {
-        writeObject(jsonParser, indentation.push());
-        isFirst = false;
-      }
-
-      else if (parseEvent == JsonParser.Event.END_OBJECT) {
-        writer_.write(newline_);
-        writer_.write(indentation.pop().toString());
-        writer_.write('}');
-        return;
-      }
-
-      else if (parseEvent == JsonParser.Event.START_ARRAY) {
-        writeArray(jsonParser, indentation.push());
-      }
-
-      else if (parseEvent == JsonParser.Event.END_ARRAY) {
-        assert false : "Invalid state";
-      }
-
-      else if (parseEvent == JsonParser.Event.VALUE_FALSE) {
-        writer_.write(spacing_);
-        writer_.write("false");
-      }
-
-      else if (parseEvent == JsonParser.Event.VALUE_TRUE) {
-        writer_.write(spacing_);
-        writer_.write("true");
-      }
-
-      else if (parseEvent == JsonParser.Event.VALUE_NULL) {
-        writer_.write(spacing_);
-        writer_.write("null");
-      }
-
-      else if (parseEvent == JsonParser.Event.VALUE_NUMBER) {
-        BigDecimal value = jsonParser.getBigDecimal();
-        writer_.write(spacing_);
-        writer_.write(value.toString());
-      }
-
-      else if (parseEvent == JsonParser.Event.VALUE_STRING) {
-        String value = jsonParser.getString();
-        writer_.write(spacing_);
-        writer_.write('\"');
-        writer_.write(value);
-        writer_.write('\"');
-      }
+      isFirst = false;
     }
+
+    if (!jsonObject.isEmpty()) {
+      writer_.write(newline_);
+      writer_.write(indentation.toString());
+    }
+
+    writer_.write("}");
   }
 
   /**
-   * Write the curve data of the specified JSON file to the stream
+   * Write the specified JSON array to the current writer.
+   *
+   * @param jsonArray    Array to write. Non-null.
+   * @param indentation  The current indentation level. Non-null.
+   */
+  private void writeArray(JsonArray jsonArray, Indentation indentation)
+    throws IOException
+  {
+    assert jsonArray != null : "jsonArray cannot be null";
+    assert indentation != null : "indentation cannot be null";
+
+    boolean isHorizontal = !JsonUtil.containsObjects(jsonArray);
+
+    writer_.write('[');
+
+    boolean isFirst = true;
+
+    for (JsonValue jsonValue : jsonArray) {
+      if (!isFirst) {
+        writer_.write(",");
+        if (isHorizontal)
+          writer_.write(spacing_);
+      }
+
+      if (!isHorizontal) {
+        writer_.write(newline_);
+        writer_.write(indentation.push().toString());
+      }
+
+      writeValue(jsonValue, indentation.push());
+
+      isFirst = false;
+    }
+
+    if (!jsonArray.isEmpty() && !isHorizontal) {
+      writer_.write(newline_);
+      writer_.write(indentation.toString());
+    }
+
+    writer_.write(']');
+  }
+
+  /**
+   * Write the speicfied JSON Well Logg Format header object to the current writer.
+   * <p>
+   * This method is equal the writeHeader method apart from its special handling
+   * of the specific keys startIndex, endIndex and step so that these gets identical
+   * formatting as the index curve of the log.
+   *
+   * @param header       The JSON Well Log Format header object. Non-null.
+   * @param indentation  The current indentation level. Non-null.
+   * @param log          The log of this header. Non-null.
+   */
+  private void writeHeaderObject(JsonObject header, Indentation indentation, JsonLog log)
+    throws IOException
+  {
+    assert header != null : "header cannot be null";
+    assert indentation != null : "indentation cannot be null";
+    assert log != null : "log cannot be null";
+
+    JsonCurve indexCurve = log.getNCurves() > 0 ? log.getCurves().get(0) : null;
+    Formatter indexCurveFormatter = indexCurve != null ? log.createFormatter(indexCurve, true) : null;
+
+    writer_.write('{');
+
+    boolean isFirst = true;
+
+    for (Map.Entry<String,JsonValue> entry : header.entrySet()) {
+      String key = entry.getKey();
+      JsonValue value = entry.getValue();
+
+      if (!isFirst)
+        writer_.write(',');
+
+      writer_.write(newline_);
+      writer_.write(indentation.push().toString());
+      writer_.write('\"');
+      writer_.write(key);
+      writer_.write('\"');
+      writer_.write(':');
+      writer_.write(spacing_);
+
+      //
+      // Special handling of startIndex, endIndex and step so that
+      // they get the same formatting as the index curve data.
+      //
+      if (indexCurveFormatter != null && (key.equals("startIndex") || key.equals("endIndex") || key.equals("step"))) {
+        String text = indexCurveFormatter.format(Util.getAsDouble(JsonUtil.getValue(value)));
+        writer_.write(text);
+      }
+      else if (value.getValueType() == JsonValue.ValueType.OBJECT && JsonTable.isTable((JsonObject) value)) {
+        writeObject((JsonObject) value, indentation.push());
+      }
+      else {
+        writeValue(value, indentation.push());
+      }
+
+      isFirst = false;
+    }
+
+    if (!header.isEmpty()) {
+      writer_.write(newline_);
+      writer_.write(indentation.toString());
+    }
+
+    writer_.write("}");
+  }
+
+  /**
+   * Write the curve data of the specified JSON log to the stream
    * of this writer.
    *
    * @param log           Log to write curve data of. Non-null.
@@ -597,11 +630,9 @@ public final class JsonWriter
     //
     writer_.write(indentation.toString());
     writer_.write("\"header\":");
+    writer_.write(spacing_);
 
-    JsonParser jsonParser = Json.createParserFactory(null).createParser(log.getHeader());
-    jsonParser.next();
-    writeObject(jsonParser, indentation.push());
-    jsonParser.close();
+    writeHeaderObject(log.getHeader(), indentation, log);
 
     writer_.write(',');
 
@@ -710,9 +741,9 @@ public final class JsonWriter
    * curves with new data there is no need for the client to
    * keep the full volume in memory at any point in time.
    * <p>
-   * <b>NOTE:</b> This method should be called after the JSON meta
-   * data has been written (see {@link #write}), and the JSON log
-   * must be compatible with this.
+   * <b>NOTE:</b> This method should be called after the
+   * JSON Well Log Format metadata has been written (see {@link #write}),
+   * and the JSON log must be compatible with this.
    * <p>
    * When writing is done, close the stream with {@link #close}.
    *
@@ -743,7 +774,7 @@ public final class JsonWriter
   }
 
   /**
-   * Append the final brackets to the JSON stream and
+   * Append the final brackets to the JSON Well Log Format stream and
    * close the writer.
    */
   @Override
@@ -774,8 +805,7 @@ public final class JsonWriter
   }
 
   /**
-   * Convenience method for writing the content of the specified logs
-   * to a string.
+   * Convenience method for returning a string representation of the specified logs.
    *
    * @param logs         Logs to write. Non-null.
    * @param isPretty     True to write in human readable pretty format, false
@@ -822,8 +852,7 @@ public final class JsonWriter
   }
 
   /**
-   * Convenience method for writing the content of the specified log
-   * to a string.
+   * Convenience method for returning a string representation of the specified log.
    *
    * @param log          Log to write. Non-null.
    * @param isPretty     True to write in human readable pretty format, false
@@ -847,8 +876,8 @@ public final class JsonWriter
   }
 
   /**
-   * Convenience method for writing the content of the specified log
-   * to a pretty printed string.
+   * Convenience method for returning a pretty printed string representation
+   * of the specified log.
    *
    * @param log  Log to write. Non-null.
    * @return     The requested string. Never null.
@@ -860,5 +889,27 @@ public final class JsonWriter
       throw new IllegalArgumentException("log cannot be null");
 
     return toString(log, true, 2);
+  }
+
+  /**
+   * Testing this class.
+   *
+   * @param arguments  Application arguments. Not used.
+   */
+  private static void main(String[] arguments)
+  {
+    File file = new File("C:/Users/main/logdata/json/WLC_COMPOSITE_1.JSON");
+    JsonReader reader = new JsonReader(file);
+
+    try {
+      List<JsonLog> jsonLogs = reader.read(true, true, null);
+
+      for (JsonLog jsonLog : jsonLogs) {
+        System.out.println(JsonWriter.toString(jsonLog, false, 0));
+      }
+    }
+    catch (Exception exception) {
+      exception.printStackTrace();
+    }
   }
 }

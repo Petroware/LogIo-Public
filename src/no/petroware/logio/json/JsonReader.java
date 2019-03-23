@@ -37,13 +37,14 @@ import no.petroware.logio.util.Util;
  *   reader.readData(logs);
  * </pre>
  *
- * Note that even if only meta-data is read, all curve information
+ * Note that even if only metadata is read, all curve information
  * are properly established as this information comes from metadata.
  * Only the curve <em>values</em> will be missing.
  * <p>
  * If the JSON content is larger than physical memory, it is possible
  * to <em>stream</em> (process than throw away) the data during read.
- * See {@link JsonDataListener}.
+ * See {@link JsonDataListener}. The same mechanism may be used
+ * to <em>abort</em> the reading process during the operation.
  *
  * @author <a href="mailto:info@petroware.no">Petroware AS</a>
  */
@@ -98,7 +99,7 @@ public final class JsonReader
    * @param file     File to check. Non-null.
    * @param content  A number of bytes from the start of the file.
    *                 Null to classify on file name only.
-   * @return Probability that the file is a JSON well log file. [0.0,1.0].
+   * @return Probability that the file is a JSON Well Log file. [0.0,1.0].
    * @throws IllegalArgumentException  If file is null.
    */
   public static double isJsonFile(File file, byte[] content)
@@ -117,10 +118,7 @@ public final class JsonReader
     if (content != null) {
       String s = new String(content);
 
-      if (!s.contains("\"logs\""))
-        return 0.0;
-
-      if (s.contains("\"log\""))
+      if (s.contains("\"header\""))
         return 0.95;
 
       if (s.contains("\"curves\""))
@@ -142,17 +140,18 @@ public final class JsonReader
    *                                 been read. Null if not used.
    *
    */
-  private static void readData(JsonParser jsonParser, JsonLog log,
-                               boolean shouldReadBulkData,
-                               boolean shouldCaptureStatistics,
-                               JsonDataListener dataListener)
+  private void readData(JsonParser jsonParser, JsonLog log,
+                        boolean shouldReadBulkData,
+                        boolean shouldCaptureStatistics,
+                        JsonDataListener dataListener)
+    throws InterruptedException
   {
     assert jsonParser != null : "jsonParser cannot be null";
     assert log != null : "log cannot be null";
 
     int curveNo = 0;
     int dimension = 0;
-    int nDimensions = 1;
+    // int nDimensions;
 
     int level = 0;
 
@@ -181,8 +180,11 @@ public final class JsonReader
           curveNo = 0;
           dimension = 0;
 
-          if (dataListener != null)
-            dataListener.dataRead(log);
+          if (dataListener != null) {
+            boolean shouldContinue = dataListener.dataRead(log);
+            if (!shouldContinue)
+              throw new InterruptedException("Reading aborted by client: " + file_.getPath());
+          }
         }
 
         //
@@ -222,7 +224,7 @@ public final class JsonReader
 
         JsonCurve curve = log.getCurves().get(curveNo);
         Class<?> valueType = curve.getValueType();
-        nDimensions = curve.getNDimensions();
+        int nDimensions = curve.getNDimensions();
 
         if (shouldCaptureStatistics)
           curve.getStatistics().push(Util.getAsDouble(value));
@@ -290,7 +292,7 @@ public final class JsonReader
         // "name"
         //
         if (key.equals("name")) {
-          parseEvent = jsonParser.next();
+          jsonParser.next();
           curveName = jsonParser.getString();
         }
 
@@ -322,7 +324,7 @@ public final class JsonReader
         // "valueType"
         //
         else if (key.equals("valueType")) {
-          parseEvent = jsonParser.next();
+          jsonParser.next();
           String valueTypeString = jsonParser.getString();
           JsonValueType jsonValueType = JsonValueType.get(valueTypeString);
           if (jsonValueType == null)
@@ -334,7 +336,7 @@ public final class JsonReader
         // "dimensions"
         //
         else if (key.equals("dimensions")) {
-          parseEvent = jsonParser.next();
+          jsonParser.next();
           nDimensions = jsonParser.getInt();
         }
       }
@@ -372,20 +374,22 @@ public final class JsonReader
    * Read log object from the current position in the JSON parser
    * and return as a JsonLog instance.
    *
-   * @param jsonParser          The parser. Non-null.
-   * @param shouldReadBulkData  True if bulk data should be read, false
-   *                            if only metadata should be read.
+   * @param jsonParser           The parser. Non-null.
+   * @param shouldReadBulkData   True if bulk data should be read, false
+   *                             if only metadata should be read.
    * @param shouldCaptureStatistics  True if curve statistics should be
-   *                            captures, false otherwise,
-   * @param dataListener        Client data listener. Null if not used.
+   *                             captures, false otherwise,
+   * @param dataListener         Client data listener. Null if not used.
    * @return  The read instance. Never null.
    * @throws IOException  If the read operation fails for some reason.
+   * @throws InterruptedException  If the client returns <tt>false</tt> from
+   *                             the {@link JsonDataListener#dataRead} method.
    */
   private JsonLog readLog(JsonParser jsonParser,
                           boolean shouldReadBulkData,
                           boolean shouldCaptureStatistics,
                           JsonDataListener dataListener)
-    throws IOException
+    throws IOException, InterruptedException
   {
     JsonLog log = new JsonLog();
 
@@ -467,10 +471,12 @@ public final class JsonReader
    *                      Null if not used.
    * @throws IllegalArgumentException  If logs is null.
    * @throws IOException  If the read operation fails for some reason.
+   * @throws InterruptedException  If the client returns <tt>false</tt> from
+   *                      the {@link JsonDataListener#dataRead} method.
    */
   public void readData(List<JsonLog> logs, boolean shouldCaptureStatistics,
                        JsonDataListener dataListener)
-    throws IOException
+    throws IOException, InterruptedException
   {
     if (logs == null)
       throw new IllegalArgumentException("logs cannot be null");
@@ -501,40 +507,71 @@ public final class JsonReader
    *                            captures, false otherwise,
    * @param dataListener        Client data listener. Null if not used.
    * @return                    The logs of the JSON stream. Never null.
-   * @throws IOException  If the read operation fails for some reason.
+   * @throws IOException        If the read operation fails for some reason.
+   * @throws InterruptedException  If the client returns <tt>false</tt> from
+   *                            the {@link JsonDataListener#dataRead} method.
    */
   public List<JsonLog> read(boolean shouldReadBulkData,
                             boolean shouldCaptureStatistics,
                             JsonDataListener dataListener)
-    throws IOException
+    throws IOException, InterruptedException
   {
     List<JsonLog> logs = new ArrayList<>();
 
-    InputStream inputStream = inputStream_ != null ? inputStream_ : new FileInputStream(file_);
-    JsonParser jsonParser = Json.createParser(inputStream);
+    InputStream inputStream = null;
 
-    while (jsonParser.hasNext()) {
-      JsonParser.Event parseEvent = jsonParser.next();
+    try {
+      inputStream = inputStream_ != null ? inputStream_ : new FileInputStream(file_);
+      JsonParser jsonParser = Json.createParser(inputStream);
 
-      if (parseEvent == JsonParser.Event.END_ARRAY)
-        return logs;
+      while (jsonParser.hasNext()) {
+        JsonParser.Event parseEvent = jsonParser.next();
 
-      if (parseEvent == JsonParser.Event.START_OBJECT) {
-        JsonLog log = readLog(jsonParser,
-                              shouldReadBulkData,
-                              shouldCaptureStatistics,
-                              dataListener);
-        logs.add(log);
+        if (parseEvent == JsonParser.Event.END_ARRAY)
+          return logs;
+
+        if (parseEvent == JsonParser.Event.START_OBJECT) {
+          JsonLog log = readLog(jsonParser,
+                                shouldReadBulkData,
+                                shouldCaptureStatistics,
+                                dataListener);
+          logs.add(log);
+        }
+      }
+
+      jsonParser.close();
+
+      return logs;
+    }
+    catch (IOException exception) {
+      throw exception;
+    }
+    catch (InterruptedException exception) {
+      throw exception;
+    }
+    finally {
+      // We only close in the file input case.
+      // Otherwise the client manage the stream.
+      if (file_ != null)
+        inputStream.close();
+    }
+  }
+
+  private static void main(String[] arguments)
+  {
+    File file = new File("C:/Users/main/logdata/json/WLC_COMPOSITE_1.JSON");
+    JsonReader reader = new JsonReader(file);
+
+    try {
+      List<JsonLog> jsonLogs = reader.read(true, true, null);
+
+      for (JsonLog jsonLog : jsonLogs) {
+        JsonTable table = jsonLog.getTable("table1");
+        System.out.println(table);
       }
     }
-
-    jsonParser.close();
-
-    // We only close in the file input case.
-    // Otherwise the client manage the stream.
-    if (file_ != null)
-      inputStream.close();
-
-    return logs;
+    catch (Exception exception) {
+      exception.printStackTrace();
+    }
   }
 }

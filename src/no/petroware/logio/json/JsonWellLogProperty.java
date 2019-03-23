@@ -1,7 +1,7 @@
 package no.petroware.logio.json;
 
 /**
- * List the well known properties of JSON well log files.
+ * List the well known properties of JSON Well Log Format files.
  *
  * @author <a href="mailto:info@petroware.no">Petroware AS</a>
  */
@@ -36,6 +36,9 @@ public enum JsonWellLogProperty
 
   /** Run number. */
   RUN_NUMBER("runNumber"),
+
+  /** Source system or process of this log. */
+  SOURCE("source"),
 
   /** Start index. */
   START_INDEX("startIndex"),

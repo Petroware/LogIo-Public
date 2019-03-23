@@ -1,8 +1,14 @@
 package no.petroware.logio.util;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * A collection of utilities for the Log I/O library.
@@ -71,7 +77,7 @@ public final class Util
     long wholePart = Math.round(d);
     int nSignificant = ("" + wholePart).length();
 
-    double fractionPart = d - wholePart;
+    double fractionPart = Math.abs(d - wholePart);
 
     int nDecimals = 0;
     int order = 1;
@@ -94,6 +100,20 @@ public final class Util
     }
 
     return nDecimals;
+  }
+
+  /**
+   * Format the specified floating point number to a string
+   * with the most sensible number of decimals.
+   *
+   * @param d  Double number to format.
+   * @return   Associated string representation.
+   */
+  public static String toString(double d)
+  {
+    int nDecimals = countDecimals(d);
+    String formatString = "%." + nDecimals + "f";
+    return String.format(Locale.US, formatString, d);
   }
 
   /**
@@ -318,6 +338,7 @@ public final class Util
     if (value == null)
       return null;
 
+    // Not sure why we return emty string as null, but don't change until we know
     if (valueType == String.class)
       return value.toString().length() == 0 ? null : value.toString();
 
@@ -335,5 +356,48 @@ public final class Util
       return value;
 
     return getAsType(getAsDouble(value), valueType);
+  }
+
+  /**
+   * Read a portion of the specified file so it can be used
+   * for classifying the file by content.
+   *
+   * @param file    File to read from. Non-null.
+   * @param nBytes  Number of bytes to read. About 2000 is fine for
+   *                file classification.
+   * @return        The portion read. Null if the read operation failed.
+   */
+  public static byte[] readContent(File file, int nBytes)
+  {
+    byte[] fileContent = null;
+
+    FileChannel fileChannel = null;
+
+    try {
+      FileInputStream fileInputStream = new FileInputStream(file);
+      fileChannel = fileInputStream.getChannel();
+      ByteBuffer buffer = ByteBuffer.allocate(nBytes);
+      int nActualBytes = fileChannel.read(buffer);
+      if (nActualBytes > 0) {
+        buffer.rewind();
+        fileContent = new byte[nActualBytes];
+        buffer.get(fileContent);
+      }
+    }
+    catch (IOException exception) {
+      return null;
+    }
+    finally {
+      if (fileChannel != null) {
+        try {
+          fileChannel.close();
+        }
+        catch (IOException exception) {
+          // Ignore
+        }
+      }
+    }
+
+    return fileContent;
   }
 }

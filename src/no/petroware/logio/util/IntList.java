@@ -467,7 +467,7 @@ public final class IntList implements List<Integer>
     }
   }
 
-  public static void main(String[] arguments)
+  private static void main(String[] arguments)
   {
     IntList list = new IntList();
 
@@ -480,6 +480,5 @@ public final class IntList implements List<Integer>
 
     for (Integer i : list)
       System.out.println(i);
-
   }
 }

@@ -1,24 +1,26 @@
 package no.petroware.logio.json;
 
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 import javax.json.Json;
-import javax.json.JsonArrayBuilder;
 import javax.json.JsonObject;
 import javax.json.JsonObjectBuilder;
-import javax.json.stream.JsonParser;
+import javax.json.JsonValue;
 
 import no.petroware.logio.util.Formatter;
-import no.petroware.logio.util.ISO8601DateParser;
 import no.petroware.logio.util.Util;
 
 /**
  * Class representing the content of one log.
- * A log constsis of a header, curve definitions, and curve data.
+ * A log consists of a header, curve definitions, and curve data.
  *
  * @author <a href="mailto:info@petroware.no">Petroware AS</a>
  */
@@ -26,12 +28,14 @@ public final class JsonLog
 {
   /**
    * The log header data as a single JSON object.
+   * <p>
+   * We keep all the metadata in JSON form as the JsonLog class as such
+   * does not take control of its entire content. Metadata may contain
+   * anything the client like as log as it is valid JSON.
    */
   private JsonObject header_;
 
-  /**
-   * The curves of this JSON log.
-   */
+  /** The curves of this JSON log. */
   private final List<JsonCurve> curves_ = new CopyOnWriteArrayList<>();
 
   /** Indicate if this instance includes curve data or not. */
@@ -48,7 +52,7 @@ public final class JsonLog
   }
 
   /**
-   * Create an empty JSON well log.
+   * Create an empty JSON Well Log Format log instance.
    */
   public JsonLog()
   {
@@ -79,6 +83,7 @@ public final class JsonLog
     assert header != null : "header cannot be null";
 
     synchronized (this) {
+      // This is safe as JsonObject is immutable
       header_ = header;
     }
   }
@@ -91,6 +96,7 @@ public final class JsonLog
   JsonObject getHeader()
   {
     synchronized (this) {
+      // This is safe as JsonObject is immutable
       return header_;
     }
   }
@@ -99,311 +105,66 @@ public final class JsonLog
    * Set a string header property of this log.
    *
    * @param key    Key of property to set. Non-null.
-   * @param value  Associated value. Null to unset.
-   * @throws IllegalArgumentException  If key is null.
+   * @param value  Associated value. Null to unset. Must be of type
+   *               BigDecimal, BigInteger, Boolean, Double, Integer,
+   *               Long, String or Date.
+   * @throws IllegalArgumentException  If key is null or value is not of a
+   *               legal primitive type.
    */
-  public void setProperty(String key, String value)
+  public void setProperty(String key, Object value)
   {
     if (key == null)
       throw new IllegalArgumentException("key cannot be null");
 
-    JsonObjectBuilder objectBuilder = Json.createObjectBuilder();
-    header_.forEach(objectBuilder::add);
-
-    if (value == null)
-      objectBuilder.addNull(key);
-    else
-      objectBuilder.add(key, value);
-
-    setHeader(objectBuilder.build());
-  }
-
-  /**
-   * Set a floating point numeric header property of this log.
-   *
-   * @param key    Key of property to set. Non-null.
-   * @param value  Associated value. Null to unset.
-   * @throws IllegalArgumentException  If key is null.
-   */
-  public void setProperty(String key, Double value)
-  {
-    if (key == null)
-      throw new IllegalArgumentException("key cannot be null");
+    if (value != null &&
+        !(value instanceof BigDecimal) &&
+        !(value instanceof BigInteger) &&
+        !(value instanceof Boolean) &&
+        !(value instanceof Double) &&
+        !(value instanceof Integer) &&
+        !(value instanceof Long) &&
+        !(value instanceof String) &&
+        !(value instanceof Date) &&
+        !(value instanceof JsonValue))
+      throw new IllegalArgumentException("Invalid property type: " + value.getClass());
 
     JsonObjectBuilder objectBuilder = Json.createObjectBuilder();
-    header_.forEach(objectBuilder::add);
 
-    if (value == null)
-      objectBuilder.addNull(key);
-    else
-      objectBuilder.add(key, value);
-
-    setHeader(objectBuilder.build());
-  }
-
-  /**
-   * Set a integer numeric header property of this log.
-   *
-   * @param key    Key of property to set. Non-null.
-   * @param value  Associated value. Null to unset.
-   * @throws IllegalArgumentException  If key is null.
-   */
-  public void setProperty(String key, Integer value)
-  {
-    if (key == null)
-      throw new IllegalArgumentException("key cannot be null");
-
-    JsonObjectBuilder objectBuilder = Json.createObjectBuilder();
-    header_.forEach(objectBuilder::add);
-
-    if (value == null)
-      objectBuilder.addNull(key);
-    else
-      objectBuilder.add(key, value);
-
-    setHeader(objectBuilder.build());
-  }
-
-  /**
-   * Set a boolean header property of this log.
-   *
-   * @param key    Key of property to set. Non-null.
-   * @param value  Associated value. Null to unset.
-   * @throws IllegalArgumentException  If key is null.
-   */
-  public void setProperty(String key, Boolean value)
-  {
-    if (key == null)
-      throw new IllegalArgumentException("key cannot be null");
-
-    JsonObjectBuilder objectBuilder = Json.createObjectBuilder();
-    header_.forEach(objectBuilder::add);
-
-    if (value == null)
-      objectBuilder.addNull(key);
-    else
-      objectBuilder.add(key, value);
-
-    setHeader(objectBuilder.build());
-  }
-
-  /**
-   * Set a date header property of this log.
-   *
-   * @param key    Key of property to set. Non-null.
-   * @param value  Associated value. Null to unset.
-   * @throws IllegalArgumentException  If key is null.
-   */
-  public void setProperty(String key, Date value)
-  {
-    if (key == null)
-      throw new IllegalArgumentException("key cannot be null");
-
-    JsonObjectBuilder objectBuilder = Json.createObjectBuilder();
-    header_.forEach(objectBuilder::add);
-
-    if (value == null)
-      objectBuilder.addNull(key);
-    else
-      objectBuilder.add(key, ISO8601DateParser.toString(value));
-
-    setHeader(objectBuilder.build());
-  }
-
-  /**
-   * Add a LAS type parameter to the header of this log.
-   * <p>
-   * This method is typically used when converting LAS files to
-   * JSON to make sure information is not lost. In general one
-   * should be careful adding properties like these as their
-   * <em>information value</em> is low. There is very limited
-   * possibility to further process information that is not tagged
-   * or dictionary controlled.
-   *
-   * @param lasParameter  Parameter to add. Non-null.
-   * @throws IllegalArgumentException  If lasParameter is null.
-   */
-  public void addLasParameter(JsonLasParameter lasParameter)
-  {
-    if (lasParameter == null)
-      throw new IllegalArgumentException("lasParameter cannot be null");
-
-    JsonObjectBuilder objectBuilder = Json.createObjectBuilder();
-    header_.forEach(objectBuilder::add);
-
-    Object value = lasParameter.getValue();
-
-    JsonObjectBuilder lasParameterBuilder = Json.createObjectBuilder();
-    if (value == null)
-      lasParameterBuilder.addNull("value");
-    else if (value instanceof Double)
-      lasParameterBuilder.add("value", (double) value);
-    else if (value instanceof Integer)
-      lasParameterBuilder.add("value", (int) value);
-    else if (value instanceof Date)
-      lasParameterBuilder.add("value", ISO8601DateParser.toString((Date) value));
-    else if (value instanceof Boolean)
-      lasParameterBuilder.add("value", (boolean) value);
-    else
-      lasParameterBuilder.add("value", value.toString());
-
-    String unit = lasParameter.getUnit();
-    if (unit != null)
-      lasParameterBuilder.add("unit", unit);
-    else
-      lasParameterBuilder.addNull("unit");
-
-    String description = lasParameter.getDescription();
-    if (description != null)
-      lasParameterBuilder.add("description", description);
-    else
-      lasParameterBuilder.addNull("description");
-
-
-    objectBuilder.add(lasParameter.getName(), lasParameterBuilder);
-
-    setHeader(objectBuilder.build());
-  }
-
-  /**
-   * Return header property for the specified key as a <em>LAS parameter</em>.
-   * <p>
-   * This feature is typically used when a JSON log has been converted from LAS.
-   * See {@link JsonLasParameter} for more information.
-   *
-   * @param name  Name of LAS parameter to get. Non-null.
-   * @return      The associated JSON object as a LAS parameter.
-   *              Null if not found, or not compatible with the LAS parameter
-   *              type.
-   * @throws IllegalArgumentException  If name is null.
-   */
-  public JsonLasParameter getLasParameter(String name)
-  {
-    if (name == null)
-      throw new IllegalArgumentException("name cannot be null");
-
-    JsonParser jsonParser = Json.createParserFactory(null).createParser(header_);
-    jsonParser.next(); // Proceed past the first START_OBJECT
-
-    Object object = JsonUtil.findObject(jsonParser, name);
-    jsonParser.close();
-
-    if (object instanceof JsonObject) {
-      jsonParser = Json.createParserFactory(null).createParser((JsonObject) object);
-      jsonParser.next(); // Proceed past the first START_OBJECT
-
-      Object valueObject = JsonUtil.findObject(jsonParser, "value");
-      Object value = valueObject;
-
-      Object unitObject = JsonUtil.findObject(jsonParser, "unit");
-      String unit = unitObject != null ? unitObject.toString() : null;
-
-      Object descriptionObject = JsonUtil.findObject(jsonParser, "description");
-      String description = descriptionObject != null ? descriptionObject.toString() : null;
-
-      jsonParser.close();
-
-      return new JsonLasParameter(name, value, unit, description);
+    synchronized (this) {
+      header_.forEach(objectBuilder::add);
+      JsonUtil.add(objectBuilder, key, value);
+      setHeader(objectBuilder.build());
     }
-
-    return null;
-  }
-
-  /**
-   * Add a DLIS set type parameter to the header of this log.
-   * <p>
-   * This method is typically used when converting DLIS files to
-   * JSON to make sure information is not lost. In general one
-   * should be careful adding properties like these as their
-   * <em>information value</em> is low. There is very limited
-   * possibility to further process information that is not tagged
-   * or dictionary controlled.
-   *
-   * @param dlisSet  Set to add. Non-null.
-   * @throws IllegalArgumentException  If dlisSet is null.
-   */
-  public void addDlisSet(JsonDlisSet dlisSet)
-  {
-    if (dlisSet == null)
-      throw new IllegalArgumentException("dlisSet cannot be null");
-
-    // Root builder
-    JsonObjectBuilder objectBuilder = Json.createObjectBuilder();
-    header_.forEach(objectBuilder::add);
-
-    // Attribute builder
-    JsonArrayBuilder attributeBuilder = Json.createArrayBuilder();
-    for (String attributeName : dlisSet.getAttributes())
-      attributeBuilder.add(attributeName);
-
-    /*
-    // Objects builder
-    JsonArrayBuilder objectsBuilder = Json.createArrayBuilder();
-    for (String objectName : dlisSet.getObjects()) {
-      JsonArrayBuilder objectBuilder = Json.createArrayBuilder();
-
-
-    }
-    */
-
-
-    JsonObjectBuilder dlisSetBuilder = Json.createObjectBuilder();
-    dlisSetBuilder.add("attributes", attributeBuilder);
-
-    objectBuilder.add(dlisSet.getName(), dlisSetBuilder);
-
-    setHeader(objectBuilder.build());
-  }
-
-  /**
-   * Return header property for the specified key as a <em>DLIS set</em>.
-   * <p>
-   * This feature is typically used when a JSON log has been converted from DLIS.
-   * See {@link JsonDlisSet} for more information.
-   *
-   * @param name  Name of LAS parameter to get. Non-null.
-   * @return      The associated JSON object as a LAS parameter.
-   *              Null if not found, or not compatible with the LAS parameter
-   *              type.
-   * @throws IllegalArgumentException  If name is null.
-   */
-  public JsonDlisSet getDlisSet(String name)
-  {
-    if (name == null)
-      throw new IllegalArgumentException("name cannot be null");
-
-    // TODO
-
-    return null;
   }
 
   /**
    * Return all the header property keys of this log.
    *
-   * @return  All property keys of this JSON log. Never null.
+   * @return  All property keys of this log. Never null.
    */
-  public List<String> getProperties()
+  public Set<String> getProperties()
   {
-    List<String> properties = new ArrayList<>();
+    return getHeader().keySet();
+  }
 
-    JsonParser jsonParser = Json.createParserFactory(null).createParser(header_);
-    jsonParser.next(); // Proceed past the first START_OBJECT
+  /**
+   * Return header property for the specified key.
+   * <p>
+   * This is a generic method for clients that add or know about custom content
+   * of the well log. It is up to the client program to parse the returned
+   * content into the appropriate type.
+   *
+   * @param key  Key of property to get. Non-null.
+   * @return     The associated value, or null if not found.
+   * @throws IllegalArgumentException  If key is null.
+   */
+  public Object getProperty(String key)
+  {
+    if (key == null)
+      throw new IllegalArgumentException("key cannot be null");
 
-    while (jsonParser.hasNext()) {
-      JsonParser.Event parseEvent = jsonParser.next();
-
-      // Capture keys
-      if (parseEvent == JsonParser.Event.KEY_NAME)
-        properties.add(jsonParser.getString());
-
-      // Proceed past complete objects
-      else if (parseEvent == JsonParser.Event.START_OBJECT)
-        JsonUtil.readJsonObject(jsonParser);
-    }
-
-    jsonParser.close();
-
-    return properties;
+    JsonValue value = getHeader().get(key);
+    return value != null ? JsonUtil.getValue(value) : null;
   }
 
   /**
@@ -419,11 +180,7 @@ public final class JsonLog
     if (key == null)
       throw new IllegalArgumentException("key cannot be null");
 
-    JsonParser jsonParser = Json.createParserFactory(null).createParser(header_);
-    jsonParser.next(); // Proceed past the first START_OBJECT
-
-    Object object = JsonUtil.findObject(jsonParser, key);
-    jsonParser.close();
+    Object object = getProperty(key);
 
     // Since Util.getAsType() return null for empty string
     if (object instanceof String && object.toString().isEmpty())
@@ -445,13 +202,7 @@ public final class JsonLog
     if (key == null)
       throw new IllegalArgumentException("key cannot be null");
 
-    JsonParser jsonParser = Json.createParserFactory(null).createParser(header_);
-    jsonParser.next(); // Proceed past the first START_OBJECT
-
-    Object object = JsonUtil.findObject(jsonParser, key);
-    jsonParser.close();
-
-    return (Double) Util.getAsType(object, Double.class);
+    return (Double) Util.getAsType(getProperty(key), Double.class);
   }
 
   /**
@@ -467,13 +218,7 @@ public final class JsonLog
     if (key == null)
       throw new IllegalArgumentException("key cannot be null");
 
-    JsonParser jsonParser = Json.createParserFactory(null).createParser(header_);
-    jsonParser.next(); // Proceed past the first START_OBJECT
-
-    Object object = JsonUtil.findObject(jsonParser, key);
-    jsonParser.close();
-
-    return (Integer) Util.getAsType(object, Integer.class);
+    return (Integer) Util.getAsType(getProperty(key), Integer.class);
   }
 
   /**
@@ -489,13 +234,7 @@ public final class JsonLog
     if (key == null)
       throw new IllegalArgumentException("key cannot be null");
 
-    JsonParser jsonParser = Json.createParserFactory(null).createParser(header_);
-    jsonParser.next(); // Proceed past the first START_OBJECT
-
-    Object object = JsonUtil.findObject(jsonParser, key);
-    jsonParser.close();
-
-    return (Boolean) Util.getAsType(object, Boolean.class);
+    return (Boolean) Util.getAsType(getProperty(key), Boolean.class);
   }
 
   /**
@@ -511,38 +250,76 @@ public final class JsonLog
     if (key == null)
       throw new IllegalArgumentException("key cannot be null");
 
-    JsonParser jsonParser = Json.createParserFactory(null).createParser(header_);
-    jsonParser.next(); // Proceed past the first START_OBJECT
-
-    Object object = JsonUtil.findObject(jsonParser, key);
-    jsonParser.close();
-
-    return (Date) Util.getAsType(object, Date.class);
+    return (Date) Util.getAsType(getProperty(key), Date.class);
   }
 
   /**
-   * Return header property for the specified key.
-   * <p>
-   * This is a generic method for clients that add or know about custom content
-   * of the JSON well log. It is up to the client program to parse the returned
-   * content into the appropriate type.
+   * Return all tables from the header.
    *
-   * @param key  Key of property to get. Non-null.
-   * @return     The associated value, or null if not found.
-   * @throws IllegalArgumentException  If key is null.
+   * @return  All tables from the header. Never null.
    */
-  public Object getProperty(String key)
+  public List<JsonTable> getTables()
   {
-    if (key == null)
-      throw new IllegalArgumentException("key cannot be null");
+    List<JsonTable> tables = new ArrayList<>();
 
-    JsonParser jsonParser = Json.createParserFactory(null).createParser(header_);
-    jsonParser.next(); // Proceed past the first START_OBJECT
+    synchronized (this) {
+      for (Map.Entry<String,JsonValue> entry : header_.entrySet()) {
+        String key = entry.getKey();
+        JsonValue value = entry.getValue();
 
-    Object object = JsonUtil.findObject(jsonParser, key);
-    jsonParser.close();
+        if (value instanceof JsonObject && JsonTable.isTable((JsonObject) value))
+          tables.add(JsonTable.create(key, (JsonObject) value));
+      }
+    }
 
-    return object;
+    return tables;
+  }
+
+  /**
+   * Return matedata table with the specified name.
+   *
+   * @param tableName  Name of metadata table to get.
+   * @return           The requested metadata table, or null if not present.
+   * @throws IllegalArgumentException  If tableName is null.
+   */
+  public JsonTable getTable(String tableName)
+  {
+    if (tableName == null)
+      throw new IllegalArgumentException("tableName cannot be null");
+
+    for (JsonTable table : getTables()) {
+      if (tableName.equals(table.getName()))
+        return table;
+    }
+
+    // Not found
+    return null;
+  }
+
+  /**
+   * Add the specifed metadata table to this log.
+   *
+   * @param table  Metadata table to add. Non-null.
+   * @throws IllegalArgumentException  If table is null or a table with the
+   *               same name already exists.
+   */
+  public void addTable(JsonTable table)
+  {
+    if (table == null)
+      throw new IllegalArgumentException("table cannot be null");
+
+    if (getTable(table.getName()) != null)
+      throw new IllegalArgumentException("table already exists: " + table.getName());
+
+    JsonObject tableObject = table.asJsonObject();
+
+    JsonObjectBuilder objectBuilder = Json.createObjectBuilder();
+
+    synchronized (this) {
+      header_.forEach(objectBuilder::add);
+      objectBuilder.add(table.getName(), tableObject);
+      setHeader(objectBuilder.build());
+    }
   }
 
   /**
@@ -746,6 +523,26 @@ public final class JsonLog
   }
 
   /**
+   * Return the source (system or process) of this log.
+   *
+   * @return  Source of this log. Null if none provided.
+   */
+  public String getSource()
+  {
+    return getPropertyAsString(JsonWellLogProperty.SOURCE.getKey());
+  }
+
+  /**
+   * Set source (system or process) of this log.
+   *
+   * @param source  Source of this log. Null to unset.
+   */
+  public void setSource(String source)
+  {
+    setProperty(JsonWellLogProperty.SOURCE.getKey(), source);
+  }
+
+  /**
    * Return value type of the index of this log, typically Double.class
    * or Date.class.
    *
@@ -768,11 +565,9 @@ public final class JsonLog
    */
   public Object getStartIndex()
   {
-    Class<?> indexValueType = getIndexValueType();
-    if (indexValueType == Date.class)
-      return getPropertyAsDate(JsonWellLogProperty.START_INDEX.getKey());
-
-    return getPropertyAsDouble(JsonWellLogProperty.START_INDEX.getKey());
+    return getIndexValueType() == Date.class ?
+      getPropertyAsDate(JsonWellLogProperty.START_INDEX.getKey()) :
+      getPropertyAsDouble(JsonWellLogProperty.START_INDEX.getKey());
   }
 
   /**
@@ -797,7 +592,7 @@ public final class JsonLog
   public void setStartIndex(Object startIndex)
   {
     if (startIndex instanceof Date)
-      setProperty(JsonWellLogProperty.START_INDEX.getKey(), (Date) startIndex);
+      setProperty(JsonWellLogProperty.START_INDEX.getKey(), startIndex);
     else
       setProperty(JsonWellLogProperty.START_INDEX.getKey(), Util.getAsDouble(startIndex));
   }
@@ -808,22 +603,20 @@ public final class JsonLog
    * <b>NOTE: </b> This property is taken from header, and may not
    * necessarily be in accordance with the <em>actual</em> data of the log.
    *
-   * @return End index of the log of this JSON file. The type will be according to
+   * @return End index of this log. The type will be according to
    *         the type of the index curve, @see #getIndexValueType.
    */
   public Object getEndIndex()
   {
-    Class<?> indexValueType = getIndexValueType();
-    if (indexValueType == Date.class)
-      return getPropertyAsDate(JsonWellLogProperty.END_INDEX.getKey());
-
-    return getPropertyAsDouble(JsonWellLogProperty.END_INDEX.getKey());
+    return getIndexValueType() == Date.class ?
+      getPropertyAsDate(JsonWellLogProperty.END_INDEX.getKey()) :
+      getPropertyAsDouble(JsonWellLogProperty.END_INDEX.getKey());
   }
 
   /**
    * Return the <em>actual</em> end index of this log.
    *
-   * @return  The actual end index. Null if the log has no values.
+   * @return  The actual end index of this log. Null if the log has no values.
    */
   public Object getActualEndIndex()
   {
@@ -842,7 +635,7 @@ public final class JsonLog
   public void setEndIndex(Object endIndex)
   {
     if (endIndex instanceof Date)
-      setProperty(JsonWellLogProperty.END_INDEX.getKey(), (Date) endIndex);
+      setProperty(JsonWellLogProperty.END_INDEX.getKey(), endIndex);
     else
       setProperty(JsonWellLogProperty.END_INDEX.getKey(), Util.getAsDouble(endIndex));
   }
@@ -979,6 +772,36 @@ public final class JsonLog
   }
 
   /**
+   * Return the number of significant digits needed to properly represent
+   * values of regular data of the specified step and (maximum) magnitude.
+   * <p>
+   * The intent is to find the correct number of significant digits in order
+   * to properly preserve the regularity of such numbers.
+   *
+   * @param magnitude  Magnitude of the numbers in question. Typically
+   *                   the max value of the range.
+   * @param step       The regular step value.
+   * @return           The requested number of significant digits. [0,&gt;.
+   */
+  private static int getNSignificantDigits(double magnitude, double step)
+  {
+    // Count the number of digits in the (absolute of the) magnitude
+    int nDigits = (int) Math.round(Math.abs(Math.log10(Math.abs(magnitude))) + 0.5);
+
+    // Count the numbers of significant decimals in the regular step
+    // We will report at least 1 to keep significance within one order of magnitude
+    // of the step.
+    int nDecimals = Math.max(1, Util.countDecimals(step));
+    int nSignificantDigits = nDigits + nDecimals;
+
+    // Limit ourself to the capabilities of the platform
+    if (nSignificantDigits > 10)
+      nSignificantDigits = 10;
+
+    return nSignificantDigits;
+  }
+
+  /**
    * Return number of significant digits to use to properly represent
    * the values of the specified curve.
    *
@@ -986,8 +809,10 @@ public final class JsonLog
    * @return       The number of significant digits to use for the
    *               specified curve. [0,&gt;.
    */
-  private int getNSignificantDigits(JsonCurve curve)
+  private int getNSignificantDigits(JsonCurve curve, boolean isIndexCurve)
   {
+    assert curve != null : "curve cannot be null";
+
     Class<?> valueType = curve.getValueType();
 
     if (valueType != Double.class && valueType != Float.class)
@@ -996,12 +821,20 @@ public final class JsonLog
     if (curve.getNValues() == 0)
       return 0;
 
-    Double step = JsonUtil.computeStep(this);
-    if (step == null)
+    if (!isIndexCurve)
       return 6;
+
+    //
+    // Special treatment for the index curve so we don't accidently
+    // lose accuracy; making a regular log set irregular.
+    //
 
     Object[] range = curve.getRange();
     if (range[0] == null || range[1] == null)
+      return 6;
+
+    Double step = JsonUtil.computeStep(this);
+    if (step == null || step == 0.0)
       return 6;
 
     double minValue = Util.getAsDouble(range[0]);
@@ -1009,12 +842,7 @@ public final class JsonLog
 
     double max = Math.max(Math.abs(minValue), Math.abs(maxValue));
 
-    int nDigits = (int) Math.round(Math.abs(Math.log10(max)) + 0.5);
-    int nDecimals = Util.countDecimals(step);
-
-    int nSignificantDigits = nDigits + nDecimals;
-
-    return Math.min(nSignificantDigits, 10);
+    return getNSignificantDigits(max, step);
   }
 
   /**
@@ -1030,10 +858,9 @@ public final class JsonLog
     assert curve != null : "curve cannot be null";
 
     Class<?> valueType = curve.getValueType();
+
     if (valueType != Double.class && valueType != Float.class)
       return null;
-
-    Integer nDecimals = valueType == Double.class || valueType == Float.class ? null : 0;
 
     int nDimensions = curve.getNDimensions();
     int nValues = curve.getNValues();
@@ -1044,9 +871,9 @@ public final class JsonLog
       for (int dimension = 0; dimension < nDimensions; dimension++)
         values[dimension * nValues + index] = Util.getAsDouble(curve.getValue(dimension, index));
 
-    int nSignificantDigits = isIndexCurve ? getNSignificantDigits(curve) : 6;
+    int nSignificantDigits = isIndexCurve ? getNSignificantDigits(curve, isIndexCurve) : 6;
 
-    return new Formatter(values, nSignificantDigits, nDecimals, null);
+    return new Formatter(values, nSignificantDigits, null, null);
   }
 
   /** {@inheritDoc} */
@@ -1054,15 +881,33 @@ public final class JsonLog
   public String toString()
   {
     StringBuilder s = new StringBuilder();
-    s.append("-- JSON file\n");
+    s.append("-- JSON log\n");
 
     s.append("Header:\n");
     for (String property : getProperties())
-      System.out.println(property + ": " + getProperty(property));
+      s.append(property + ": " + getProperty(property));
 
     for (JsonCurve curve : curves_)
       s.append(curve + "\n");
 
     return s.toString();
+  }
+
+  private static void main(String[] arguments)
+  {
+    java.io.File file = new java.io.File("C:/Users/main/logdata/json/WLC_COMPOSITE_1.JSON");
+    JsonReader reader = new JsonReader(file);
+
+    try {
+      List<JsonLog> jsonLogs = reader.read(true, true, null);
+
+      for (JsonLog jsonLog : jsonLogs) {
+        JsonObject header = jsonLog.getHeader();
+        System.out.println(header);
+      }
+    }
+    catch (Exception exception) {
+      exception.printStackTrace();
+    }
   }
 }

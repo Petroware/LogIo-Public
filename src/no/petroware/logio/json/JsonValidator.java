@@ -8,10 +8,10 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.text.ParseException;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import javax.json.Json;
 import javax.json.JsonException;
@@ -29,7 +29,7 @@ import no.petroware.logio.util.ISO8601DateParser;
  * <p>
  * Usage:
  * <pre>
- *   List<JsonValidator.Message> messages = JsonValidator.getInstance().validate(new File("path/to/file.JSON"));
+ *   List&lt;JsonValidator.Message&gt; messages = JsonValidator.getInstance().validate(new File("path/to/file.json"));
  * </pre>
  *
  * @author <a href="mailto:info@petroware.no">Petroware AS</a>
@@ -75,7 +75,7 @@ public enum JsonValidator
      *
      * @param level     Severity level.
      * @param location  Stream location. Null if N/A.
-     * @param message    Textual messga.e Non-null.
+     * @param message   Textual message. Non-null.
      */
     Message(Level level, JsonLocation location, String message)
     {
@@ -155,6 +155,14 @@ public enum JsonValidator
   private final Map<String,List<String>> validUnits_ = new HashMap<>();
 
   /**
+   * Create a JSON Well Log Format validator.
+   */
+  private JsonValidator()
+  {
+    loadValidUnits();
+  }
+
+  /**
    * Return the sole instance of this class.
    *
    * @return  The sole instance of this class. Never null.
@@ -162,14 +170,6 @@ public enum JsonValidator
   public static JsonValidator getInstance()
   {
     return instance;
-  }
-
-  /**
-   * Create a JSON Well Log Format validator.
-   */
-  private JsonValidator()
-  {
-    loadValidUnits();
   }
 
   /**
@@ -184,9 +184,12 @@ public enum JsonValidator
       stream = JsonValidator.class.getResourceAsStream(UNITS_FILE);
       BufferedReader reader = new BufferedReader(new InputStreamReader(stream, "UTF-8"));
 
-      String line;
+      while (true) {
+        String line = reader.readLine();
 
-      while ((line = reader.readLine()) != null) {
+        if (line == null)
+          break;
+
         if (line.startsWith("#"))
           continue;
 
@@ -206,7 +209,7 @@ public enum JsonValidator
       }
     }
     catch (IOException exception) {
-      assert false : "Programming error. Quantities file missing.";
+      assert false : "Programming error. Quantities file missing: " + exception;
     }
     finally {
       if (stream != null) {
@@ -222,7 +225,7 @@ public enum JsonValidator
 
   /**
    * Check if the curves in the specified JSON file is aligned,
-   * i.e. that all curves and dimensions have the same number
+   * i.e.&nbsp;that all curves and dimensions have the same number
    * of values.
    *
    * @param log  Log to check. Non-null.
@@ -246,7 +249,7 @@ public enum JsonValidator
    * Validate the index range given in the header of the specified log
    * against the actual ones captured from the data section.
    *
-   * @param log               Log of header to validate. Non-null.
+   * @param log               Log to validate. Does not contain any data. Non-null.
    * @param actualStartIndex  Actual start index from file. Null if no data.
    * @param actualEndIndex    Actual end index from file. Null if no data.
    * @param minStep           Minimum step encountered in the actual data. Null if no data.
@@ -292,9 +295,9 @@ public enum JsonValidator
     //
     // End index
     //
-    if (actualEndIndex == null && !Double.isNaN(startIndex))
+    if (actualEndIndex == null && !Double.isNaN(endIndex))
       messages.add(new Message(Message.Level.WARNING, null,
-                               "endIndex " + Util.getAsType(startIndex, valueType) +
+                               "endIndex " + Util.getAsType(endIndex, valueType) +
                                " doesn't match actual: null."));
 
     if (actualEndIndex != null && Double.isNaN(endIndex))
@@ -342,7 +345,6 @@ public enum JsonValidator
 
     int curveNo = 0;
     int dimension = 0;
-    int nDimensions = 1;
 
     int nCurves = log.getNCurves();
     int level = 0;
@@ -432,7 +434,7 @@ public enum JsonValidator
 
         JsonCurve curve = log.getCurves().get(curveNo);
         Class<?> valueType = curve.getValueType();
-        nDimensions = curve.getNDimensions();
+        int nDimensions = curve.getNDimensions();
 
         if (dimension >= nDimensions) {
           throw new JsonParsingException("Invalid number of dimensions.",
@@ -444,18 +446,19 @@ public enum JsonValidator
                                          jsonParser.getLocation());
 
         if (isIndexCurve) {
-          previousIndex = startIndex;
+          double indexValue = Util.getAsDouble(value);
 
           if (startIndex == null)
-            startIndex = Util.getAsDouble(value);
+            startIndex = indexValue;
 
-          Double step = previousIndex != null ? startIndex - previousIndex : null;
+          Double step = previousIndex != null ? indexValue - previousIndex : null;
           if (step != null && (minStep == null || step < minStep))
             minStep = step;
           if (step != null && (maxStep == null || step > maxStep))
             maxStep = step;
 
-          endIndex = startIndex;
+          endIndex = indexValue;
+          previousIndex = indexValue;
         }
 
         curve.addValue(dimension, Util.getAsType(value, valueType));
@@ -575,7 +578,7 @@ public enum JsonValidator
         // "name"
         //
         if (key.equals("name")) {
-          parseEvent = jsonParser.next();
+          jsonParser.next();
           curveName = jsonParser.getString();
         }
 
@@ -607,7 +610,7 @@ public enum JsonValidator
         // "valueType"
         //
         else if (key.equals("valueType")) {
-          parseEvent = jsonParser.next();
+          jsonParser.next();
           String valueTypeString = jsonParser.getString();
           JsonValueType jsonValueType = JsonValueType.get(valueTypeString);
           if (jsonValueType == null)
@@ -620,7 +623,7 @@ public enum JsonValidator
         // "dimensions"
         //
         else if (key.equals("dimensions")) {
-          parseEvent = jsonParser.next();
+          jsonParser.next();
           nDimensions = jsonParser.getInt();
           if (nDimensions < 1) {
             throw new JsonParsingException("Invalid number of dimensions: " + nDimensions + ".",
@@ -684,7 +687,7 @@ public enum JsonValidator
     assert messages != null : "messages cannot be null";
 
     // Get the properties that are there
-    List<String> actualProperties = log.getProperties();
+    Set<String> actualProperties = log.getProperties();
 
     List<String> wellKnownProperties = new ArrayList<>();
     for (JsonWellLogProperty wellKnownProperty : JsonWellLogProperty.values())
@@ -889,5 +892,46 @@ public enum JsonValidator
     stream.close();
 
     return messages;
+  }
+
+  private static void scan(File directory)
+  {
+    assert directory != null : "directory cannot bw null";
+    assert directory.isDirectory() : "directory must be an actual directory";
+
+    File[] files = directory.listFiles();
+    if (files == null)
+      return;
+
+    for (File file : files) {
+      if (file.isDirectory())
+        scan(file);
+      else if (file.isFile()) {
+        byte[] content = Util.readContent(file, 2000);
+        if (JsonReader.isJsonFile(file, content) > 0.7) {
+          System.out.println("--- " + file.getPath());
+
+          try {
+            List<Message> messages = JsonValidator.getInstance().validate(file);
+            for (Message message : messages)
+              if (message.getLevel() == JsonValidator.Message.Level.SEVERE)
+                System.out.println(message);
+          }
+          catch (IOException exception) {
+            exception.printStackTrace();
+          }
+        }
+      }
+    }
+  }
+
+  /**
+   * Testing this class.
+   *
+   * @param arguments  Application arguments. Not used.
+   */
+  private static void main(String[] arguments)
+  {
+    scan(new File("C:/Users/main/Development/dev/jsonwelllogformat.org/Volve/"));
   }
 }

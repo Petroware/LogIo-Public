@@ -1,13 +1,21 @@
 package no.petroware.logio.json;
 
 import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.util.Date;
 import java.util.List;
 
 import javax.json.Json;
+import javax.json.JsonArray;
 import javax.json.JsonArrayBuilder;
+import javax.json.JsonNumber;
+import javax.json.JsonObject;
 import javax.json.JsonObjectBuilder;
+import javax.json.JsonString;
+import javax.json.JsonValue;
 import javax.json.stream.JsonParser;
 
+import no.petroware.logio.util.ISO8601DateParser;
 import no.petroware.logio.util.Util;
 
 /**
@@ -18,10 +26,188 @@ import no.petroware.logio.util.Util;
 final class JsonUtil
 {
   /**
+   * Private constructor to prevent client instantiation.
+   */
+  private JsonUtil()
+  {
+    assert false : "This constructor should never e called";
+  }
+
+  /**
+   * Add the specified key/value to the given JSON object builder.
+   *
+   * @param jsonObjectBuilder  JSON object builder to add to. Non-null.
+   * @param key                Key to add. Non-null.
+   * @param value              Value of key. May be null.
+   */
+  static void add(JsonObjectBuilder jsonObjectBuilder, String key, Object value)
+  {
+    assert jsonObjectBuilder != null : "jsonObjectBuilder annot be null";
+    assert key != null : "key cannot be null";
+
+    if (value == null)
+      jsonObjectBuilder.addNull(key);
+    else if (value instanceof BigDecimal)
+      jsonObjectBuilder.add(key, (BigDecimal) value);
+    else if (value instanceof BigInteger)
+      jsonObjectBuilder.add(key, (BigInteger) value);
+    else if (value instanceof Boolean)
+      jsonObjectBuilder.add(key, (Boolean) value);
+    else if (value instanceof Double)
+      jsonObjectBuilder.add(key, (Double) value);
+    else if (value instanceof Float)
+      jsonObjectBuilder.add(key, ((Number) value).doubleValue());
+    else if (value instanceof Integer)
+      jsonObjectBuilder.add(key, (Integer) value);
+    else if (value instanceof JsonValue)
+      add(jsonObjectBuilder, key, getValue((JsonValue) value));
+    else if (value instanceof Long)
+      jsonObjectBuilder.add(key, (Long) value);
+    else if (value instanceof Short)
+      jsonObjectBuilder.add(key, ((Number) value).intValue());
+    else if (value instanceof Byte)
+      jsonObjectBuilder.add(key, ((Number) value).intValue());
+    else if (value instanceof String)
+      jsonObjectBuilder.add(key, (String) value);
+    else if (value instanceof Date)
+      jsonObjectBuilder.add(key, ISO8601DateParser.toString((Date) value));
+    else
+      assert false : "Unrecognized value type: " + value.getClass();
+  }
+
+  /**
+   * Add the specified value to the given JSON array builder.
+   *
+   * @param jsonArrayBuilder  JSON array builder to add to. Non-null.
+   * @param value             Value to add. May be null.
+   */
+  static void add(JsonArrayBuilder jsonArrayBuilder, Object value)
+  {
+    assert jsonArrayBuilder != null : "jsonArrayBuilder annot be null";
+
+    if (value == null)
+      jsonArrayBuilder.addNull();
+    else if (value instanceof BigDecimal)
+      jsonArrayBuilder.add((BigDecimal) value);
+    else if (value instanceof BigInteger)
+      jsonArrayBuilder.add((BigInteger) value);
+    else if (value instanceof Boolean)
+      jsonArrayBuilder.add((Boolean) value);
+    else if (value instanceof Double)
+      jsonArrayBuilder.add((Double) value);
+    else if (value instanceof Float)
+      jsonArrayBuilder.add(((Number) value).doubleValue());
+    else if (value instanceof Integer)
+      jsonArrayBuilder.add((Integer) value);
+    else if (value instanceof JsonValue)
+      add(jsonArrayBuilder, getValue((JsonValue) value));
+    else if (value instanceof Long)
+      jsonArrayBuilder.add((Long) value);
+    else if (value instanceof Short)
+      jsonArrayBuilder.add(((Number) value).intValue());
+    else if (value instanceof Byte)
+      jsonArrayBuilder.add(((Number) value).intValue());
+    else if (value instanceof String)
+      jsonArrayBuilder.add((String) value);
+    else if (value instanceof Date)
+      jsonArrayBuilder.add(ISO8601DateParser.toString((Date) value));
+    else
+      assert false : "Unrecognized value type: " + value.getClass();
+  }
+
+  /**
+   * Return the (first) key of the specified JSON object.
+   * <p>
+   * This is a convenience method if the client knows that the
+   * object contains exactly one key.
+   *
+   * @param jsonObject  JSON object to get key from. Non-null.
+   * @return            The requested key. Never null.
+   */
+  static String getKey(JsonObject jsonObject)
+  {
+    assert jsonObject != null : "jsonObject cannot be null";
+    return jsonObject.keySet().iterator().next();
+  }
+
+  /**
+   * Return the fundamental value of the specified JSON value.
+   *
+   * @param jsonValue  JSON value to get fundamental value from. Non-null.
+   * @return           Requested value. May be null, if jsonValue if of NULL type.
+   */
+  static Object getValue(JsonValue jsonValue)
+  {
+    assert jsonValue != null : "jsonValue cannot be null";
+
+    switch (jsonValue.getValueType()) {
+      case ARRAY :
+      case OBJECT :
+        return jsonValue;
+
+      case NUMBER :
+        JsonNumber number = (JsonNumber) jsonValue;
+        if (number.isIntegral())
+          return number.intValueExact(); // TODO: Handle longs
+        else
+          return number.doubleValue();
+
+      case STRING :
+        return ((JsonString) jsonValue).getString();
+
+      case TRUE :
+        return true;
+
+      case FALSE :
+        return false;
+
+      case NULL :
+        return null;
+
+      default:
+        assert false : "Unrecognized value type: " + jsonValue.getValueType();
+        return null;
+    }
+  }
+
+  /**
+   * Check if the specified JSON value represents a
+   * primitive (number, string, boolean, null) type.
+   *
+   * @param jsonValue  JSON value to check. Non-null.
+   * @return           True if the value represents a primitive type,
+   *                   false if it represents a JSON object or a JSON array.
+   */
+  static boolean isPrimitive(JsonValue jsonValue)
+  {
+    assert jsonValue != null : "jsonValue cannot be null";
+    return jsonValue.getValueType() != JsonValue.ValueType.ARRAY &&
+           jsonValue.getValueType() != JsonValue.ValueType.OBJECT;
+  }
+
+  /**
+   * Check if the specified JSON array contains any JSON objects.
+   *
+   * @param jsonArray  JSON array to check. Non-null.
+   * @return           True if the array contains any JSON objects,
+   *                   false otherwise.
+   */
+  static boolean containsObjects(JsonArray jsonArray)
+  {
+    for (JsonValue value : jsonArray) {
+      if (value instanceof JsonArray && containsObjects((JsonArray) value) || value instanceof JsonObject)
+        return true;
+    }
+
+    // The array (or sub arrays) contains no objects
+    return false;
+  }
+
+  /**
    * Read a JSON array from the current location of the JSON parser.
    *
    * @param jsonParser  The JSON parser. Non-null.
-   * @return  The JSON array builder. Never null.
+   * @return            The JSON array builder. Never null.
    */
   static JsonArrayBuilder readJsonArray(JsonParser jsonParser)
   {
@@ -32,44 +218,46 @@ final class JsonUtil
     while (jsonParser.hasNext()) {
       JsonParser.Event parseEvent = jsonParser.next();
 
-      if (parseEvent == JsonParser.Event.START_OBJECT) {
-        JsonObjectBuilder objectBuilder = readJsonObject(jsonParser);
-        arrayBuilder.add(objectBuilder);
-      }
+      switch (parseEvent) {
+        case START_OBJECT :
+          JsonObjectBuilder objectBuilder = readJsonObject(jsonParser);
+          arrayBuilder.add(objectBuilder);
+          break;
 
-      else if (parseEvent == JsonParser.Event.END_OBJECT) {
-        assert false : "Invalid state";
-      }
+        case END_OBJECT :
+          assert false : "Invalid state";
+          break;
 
-      else if (parseEvent == JsonParser.Event.START_ARRAY) {
-        JsonArrayBuilder subArrayBuilder = readJsonArray(jsonParser);
-        arrayBuilder.add(subArrayBuilder);
-      }
+        case START_ARRAY :
+          JsonArrayBuilder subArrayBuilder = readJsonArray(jsonParser);
+          arrayBuilder.add(subArrayBuilder);
+          break;
 
-      else if (parseEvent == JsonParser.Event.END_ARRAY) {
-        return arrayBuilder;
-      }
+        case END_ARRAY :
+          return arrayBuilder;
 
-      else if (parseEvent == JsonParser.Event.VALUE_FALSE) {
-        arrayBuilder.add(false);
-      }
+        case VALUE_FALSE :
+          arrayBuilder.add(false);
+          break;
 
-      else if (parseEvent == JsonParser.Event.VALUE_TRUE) {
-        arrayBuilder.add(true);
-      }
+        case VALUE_TRUE :
+          arrayBuilder.add(true);
+          break;
 
-      else if (parseEvent == JsonParser.Event.VALUE_NULL) {
-        arrayBuilder.addNull();
-      }
+        case VALUE_NULL :
+          arrayBuilder.addNull();
+          break;
 
-      else if (parseEvent == JsonParser.Event.VALUE_NUMBER) {
-        BigDecimal value = jsonParser.getBigDecimal();
-        arrayBuilder.add(value);
-      }
+        case VALUE_NUMBER :
+          arrayBuilder.add(jsonParser.getBigDecimal());
+          break;
 
-      else if (parseEvent == JsonParser.Event.VALUE_STRING) {
-        String value = jsonParser.getString();
-        arrayBuilder.add(value);
+        case VALUE_STRING :
+          arrayBuilder.add(jsonParser.getString());
+          break;
+
+        default :
+          assert false : "Unrecognized event: " + parseEvent;
       }
     }
 
@@ -78,10 +266,10 @@ final class JsonUtil
   }
 
   /**
-   * Read a JSON array from the current location of the JSON parser.
+   * Read a JSON object from the current location of the JSON parser.
    *
    * @param jsonParser  The JSON parser. Non-null.
-   * @return  The JSON object builder. Never null.
+   * @return            The JSON object builder. Never null.
    */
   static JsonObjectBuilder readJsonObject(JsonParser jsonParser)
   {
@@ -94,125 +282,56 @@ final class JsonUtil
     while (jsonParser.hasNext()) {
       JsonParser.Event parseEvent = jsonParser.next();
 
-      if (parseEvent == JsonParser.Event.KEY_NAME) {
-        key = jsonParser.getString();
-      }
+      switch (parseEvent) {
+        case KEY_NAME :
+          key = jsonParser.getString();
+          break;
 
-      else if (parseEvent == JsonParser.Event.START_OBJECT) {
-        if (key != null) {
-          JsonObjectBuilder subObjectBuilder = readJsonObject(jsonParser);
-          objectBuilder.add(key, subObjectBuilder);
-        }
-      }
+        case START_OBJECT :
+          if (key != null) {
+            JsonObjectBuilder subObjectBuilder = readJsonObject(jsonParser);
+            objectBuilder.add(key, subObjectBuilder);
+          }
+          break;
 
-      else if (parseEvent == JsonParser.Event.END_OBJECT) {
-        return objectBuilder;
-      }
+        case END_OBJECT :
+          return objectBuilder;
 
-      else if (parseEvent == JsonParser.Event.START_ARRAY) {
-        JsonArrayBuilder arrayBuilder = readJsonArray(jsonParser);
-        objectBuilder.add(key, arrayBuilder);
-      }
+        case START_ARRAY :
+          JsonArrayBuilder arrayBuilder = readJsonArray(jsonParser);
+          objectBuilder.add(key, arrayBuilder);
+          break;
 
-      else if (parseEvent == JsonParser.Event.END_ARRAY) {
-        assert false : "Invalid state";
-      }
+        case END_ARRAY :
+          assert false : "Invalid state";
+          break;
 
-      else if (parseEvent == JsonParser.Event.VALUE_FALSE) {
-        objectBuilder.add(key, false);
-      }
+        case VALUE_FALSE :
+          objectBuilder.add(key, false);
+          break;
 
-      else if (parseEvent == JsonParser.Event.VALUE_TRUE) {
-        objectBuilder.add(key, true);
-      }
+        case VALUE_TRUE :
+          objectBuilder.add(key, true);
+          break;
 
-      else if (parseEvent == JsonParser.Event.VALUE_NULL) {
-        objectBuilder.addNull(key);
-      }
+        case VALUE_NULL :
+          objectBuilder.addNull(key);
+          break;
 
-      else if (parseEvent == JsonParser.Event.VALUE_NUMBER) {
-        BigDecimal value = jsonParser.getBigDecimal();
-        objectBuilder.add(key, value);
-      }
+        case VALUE_NUMBER :
+          objectBuilder.add(key, jsonParser.getBigDecimal());
+          break;
 
-      else if (parseEvent == JsonParser.Event.VALUE_STRING) {
-        String value = jsonParser.getString();
-        objectBuilder.add(key, value);
+        case VALUE_STRING :
+          objectBuilder.add(key, jsonParser.getString());
+          break;
+
+        default :
+          assert false : "Unrecognized event: " + parseEvent;
       }
     }
 
     assert false : "Invalid state";
-    return null;
-  }
-
-  /**
-   * Find object with the specified key from the current position in
-   * the JSON object of the given parser.
-   *
-   * @param jsonParser  JSON parser to consider. Non-null.
-   * @param key         Key to search. Non-null.
-   * @return            The requested object, or null if not found.
-   */
-  static Object findObject(JsonParser jsonParser, String key)
-  {
-    assert jsonParser != null : "jsonPArser cannot be null";
-    assert key != null : "key cannot be null";
-
-    boolean foundKey = false;
-
-    while (jsonParser.hasNext()) {
-      JsonParser.Event parseEvent = jsonParser.next();
-
-      if (parseEvent == JsonParser.Event.KEY_NAME) {
-        String tag = jsonParser.getString();
-
-        if (tag.equals(key))
-          foundKey = true;
-      }
-
-      else if (parseEvent == JsonParser.Event.START_OBJECT) {
-        JsonObjectBuilder objectBuilder = readJsonObject(jsonParser);
-        if (foundKey)
-          return objectBuilder.build();
-      }
-
-      else if (parseEvent == JsonParser.Event.END_OBJECT) {
-        return null;
-      }
-
-      else if (parseEvent == JsonParser.Event.START_ARRAY) {
-        JsonArrayBuilder arrayBuilder = readJsonArray(jsonParser);
-        if (foundKey)
-          return arrayBuilder.build();
-      }
-
-      else if (parseEvent == JsonParser.Event.VALUE_FALSE) {
-        if (foundKey)
-          return Boolean.FALSE;
-      }
-
-      else if (parseEvent == JsonParser.Event.VALUE_TRUE) {
-        if (foundKey)
-          return Boolean.TRUE;
-      }
-
-      else if (parseEvent == JsonParser.Event.VALUE_NULL) {
-        if (foundKey)
-          return null;
-      }
-
-      else if (parseEvent == JsonParser.Event.VALUE_NUMBER) {
-        if (foundKey)
-          return jsonParser.getBigDecimal();
-      }
-
-      else if (parseEvent == JsonParser.Event.VALUE_STRING) {
-        if (foundKey)
-          return jsonParser.getString();
-      }
-    }
-
-    // Key not found
     return null;
   }
 
@@ -225,12 +344,10 @@ final class JsonUtil
    *
    * @param log  Log to get step from. Non-null.
    * @return     The (minimum, maximum and average) step value of the log.
-   * @throws IllegalArgumentException  If log is null.
    */
-  static double[] findStep(JsonLog log)
+  private static double[] findStep(JsonLog log)
   {
-    if (log == null)
-      throw new IllegalArgumentException("log");
+    assert log != null : "log cannot be null";
 
     List<JsonCurve> curves = log.getCurves();
 
@@ -278,12 +395,10 @@ final class JsonUtil
    *
    * @param jsonLog  Log to compute step of. Non-null.
    * @return         The log step value. null if irregular.
-   * @throws IllegalArgumentException  If log is null.
    */
-  public static Double computeStep(JsonLog log)
+  static Double computeStep(JsonLog log)
   {
-    if (log == null)
-      throw new IllegalArgumentException("log cannot be null");
+    assert log != null : "log cannot be null";
 
     double[] step = findStep(log);
 

@@ -5,7 +5,7 @@ import no.petroware.logio.util.DataArray;
 import no.petroware.logio.util.Util;
 
 /**
- * Model a log curve as it is defined by JSON.
+ * Model a log curve as it is defined by the JSON Well Log Format.
  * <p>
  * A log curve consist of measurement data of a specific type.
  * The curve may have one or more dimensions.
@@ -39,7 +39,7 @@ public final class JsonCurve
   private final Statistics statistics_ = new Statistics();
 
   /**
-   * Create a JSON curve instance.
+   * Create a JSON Well Log Format curve instance.
    *
    * @param name                Name (mnemonic) of curve. Non-null.
    * @param description         Curve long name or description. May be null
@@ -215,7 +215,7 @@ public final class JsonCurve
   }
 
   /**
-   * Return the range (i.e the min and max value) of this curve.
+   * Return the range (i.e.&nbsp;the min and max value) of this curve.
    * The returned array is never null. The two entries may
    * be null if min/max does not exist.
    * <p>

@@ -2,7 +2,8 @@ package no.petroware.logio.json;
 
 /**
  * Provides a mechanism for the client to monitor and process data
- * <em>during</em> a JSON read operation.
+ * <em>during</em> a JSON read operation, and also to abort the
+ * process in case that is requested by user or for other reasons.
  * <p>
  * Convenient for handling JSON content that are larger than physical
  * memory. In this case the client should <em>clear</em> the log
@@ -19,6 +20,9 @@ package no.petroware.logio.json;
  *
  *         // Clear curve data to save memory
  *         log.clearCurves();
+ *
+ *         // Continue the process
+ *         return true;
  *      }
  *    }
  * </pre>
@@ -34,9 +38,15 @@ public interface JsonDataListener
    * After the client has processed the data, it may clean the curve data
    * in order to save memory storage. See {@link JsonLog#clearCurves}.
    * <p>
+   * It is also possible for the client to <em>abort</em> the reading
+   * process at this time, by returning <tt>false</tt> from the method.
+   * This will close all resources and throw an InterruptedException
+   * back to the client.
+   * <p>
    * @see JsonReader#read(boolean,boolean,JsonDataListener)
    *
    * @param log  Log that has been populated with new data. Never null.
+   * @return     True to continue reading, false to abort the process.
    */
-  public void dataRead(JsonLog log);
+  public boolean dataRead(JsonLog log);
 }

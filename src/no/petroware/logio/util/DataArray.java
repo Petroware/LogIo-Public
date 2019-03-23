@@ -109,6 +109,38 @@ public final class DataArray
   }
 
   /**
+   * Set an element of this data array.
+   *
+   * @param index  Index to set value at. [0,n&gt;.
+   *               No bounds checking for performance reasons.
+   * @param value  Value to set. It is assumed to contain the correct type (or null).
+   *               No type checking is done for performance reasons.
+   */
+  public void set(int index, Object value)
+  {
+    if (floatValues_ != null)
+      floatValues_.set(index, (Float) value);
+    else if (intValues_ != null)
+      intValues_.set(index, (Integer) value);
+    else if (longValues_ != null)
+      longValues_.set(index, (Long) value);
+    else if (doubleValues_ != null)
+      doubleValues_.set(index, (Double) value);
+    else if (timeValues_ != null)
+      timeValues_.set(index, (Date) value);
+    else if (shortValues_ != null)
+      shortValues_.set(index, (Short) value);
+    else if (byteValues_ != null)
+      byteValues_.set(index, (Byte) value);
+    else if (stringValues_ != null)
+      stringValues_.set(index, (String) value);
+    else if (boolValues_ != null)
+      boolValues_.set(index, (Boolean) value);
+    else
+      objectValues_.set(index, value);
+  }
+
+  /**
    * Return value at the specified index.
    *
    * @param index  Index to get value at. [0,n&gt;.
