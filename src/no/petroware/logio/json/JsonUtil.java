@@ -34,6 +34,23 @@ final class JsonUtil
   }
 
   /**
+   * Encode the given string by appropriate escape sequences
+   * so that it can be used as a JSON literal.
+   *
+   * @param text  Text to encode. Non-null. Without quotes.
+   * @return      Encoded text. Never null. Includes surrounding quotes.
+   */
+  static String encode(String text)
+  {
+    // We could scan the text and escape as necessary.
+    // Better is to let javax.json fix this, but as there is no public
+    // method that does this conversion we add the text to a phony JSON
+    // object and then extract it again. Probably not as efficient, but
+    // JSON Well Log Format doesn't include many strings anyway.
+    return Json.createObjectBuilder().add("x", text).build().get("x").toString();
+  }
+
+  /**
    * Add the specified key/value to the given JSON object builder.
    *
    * @param jsonObjectBuilder  JSON object builder to add to. Non-null.
@@ -53,10 +70,20 @@ final class JsonUtil
       jsonObjectBuilder.add(key, (BigInteger) value);
     else if (value instanceof Boolean)
       jsonObjectBuilder.add(key, (Boolean) value);
-    else if (value instanceof Double)
-      jsonObjectBuilder.add(key, (Double) value);
-    else if (value instanceof Float)
-      jsonObjectBuilder.add(key, ((Number) value).doubleValue());
+    else if (value instanceof Double) {
+      Double v = (Double) value;
+      if (Double.isFinite(v))
+        jsonObjectBuilder.add(key, v);
+      else
+        jsonObjectBuilder.addNull(key);
+    }
+    else if (value instanceof Float) {
+      Float v = (Float) value;
+      if (Float.isFinite(v))
+        jsonObjectBuilder.add(key, v.doubleValue());
+      else
+        jsonObjectBuilder.addNull(key);
+    }
     else if (value instanceof Integer)
       jsonObjectBuilder.add(key, (Integer) value);
     else if (value instanceof JsonValue)
@@ -93,10 +120,20 @@ final class JsonUtil
       jsonArrayBuilder.add((BigInteger) value);
     else if (value instanceof Boolean)
       jsonArrayBuilder.add((Boolean) value);
-    else if (value instanceof Double)
-      jsonArrayBuilder.add((Double) value);
-    else if (value instanceof Float)
-      jsonArrayBuilder.add(((Number) value).doubleValue());
+    else if (value instanceof Double) {
+      Double v = (Double) value;
+      if (Double.isFinite(v))
+        jsonArrayBuilder.add(v);
+      else
+        jsonArrayBuilder.addNull();
+    }
+    else if (value instanceof Float) {
+      Float v = (Float) value;
+      if (Float.isFinite(v))
+        jsonArrayBuilder.add(v.doubleValue());
+      else
+        jsonArrayBuilder.addNull();
+    }
     else if (value instanceof Integer)
       jsonArrayBuilder.add((Integer) value);
     else if (value instanceof JsonValue)

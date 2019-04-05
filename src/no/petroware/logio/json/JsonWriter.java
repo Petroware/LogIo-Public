@@ -237,7 +237,7 @@ public final class JsonWriter
           text = formatter.format(Util.getAsDouble(value));
 
         else if (valueType == String.class)
-          text = '\"' + value.toString() + '\"';
+          text = JsonUtil.encode(value.toString());
 
         else // Boolean and Integers
           text = value.toString();
@@ -277,7 +277,7 @@ public final class JsonWriter
     assert valueType != null : "valueType cannot be null";
     assert width >= 0 : "Invalid width: " + width;
 
-    String text;
+    String text = null;
 
     if (value == null)
       text = "null";
@@ -287,10 +287,12 @@ public final class JsonWriter
       text = value.toString();
     else if (formatter != null)
       text = formatter.format(Util.getAsDouble(value));
-    else if (valueType == String.class)
-      text = '\"' + value.toString() + '\"';
-    else
+    else if (Number.class.isAssignableFrom(valueType))
       text = value.toString();
+    else if (valueType == String.class)
+      text = JsonUtil.encode(value.toString());
+    else
+      assert false : "Unrecognized valueType: " + valueType;
 
     String padding = isPretty_ ? Util.getSpaces(width - text.length()) : "";
     return padding + text;
@@ -476,7 +478,8 @@ public final class JsonWriter
       // they get the same formatting as the index curve data.
       //
       if (indexCurveFormatter != null && (key.equals("startIndex") || key.equals("endIndex") || key.equals("step"))) {
-        String text = indexCurveFormatter.format(Util.getAsDouble(JsonUtil.getValue(value)));
+        double v = Util.getAsDouble(JsonUtil.getValue(value));
+        String text = Double.isFinite(v) ? indexCurveFormatter.format(v) : "null";
         writer_.write(text);
       }
       else if (value.getValueType() == JsonValue.ValueType.OBJECT && JsonTable.isTable((JsonObject) value)) {
@@ -889,27 +892,5 @@ public final class JsonWriter
       throw new IllegalArgumentException("log cannot be null");
 
     return toString(log, true, 2);
-  }
-
-  /**
-   * Testing this class.
-   *
-   * @param arguments  Application arguments. Not used.
-   */
-  private static void main(String[] arguments)
-  {
-    File file = new File("C:/Users/main/logdata/json/WLC_COMPOSITE_1.JSON");
-    JsonReader reader = new JsonReader(file);
-
-    try {
-      List<JsonLog> jsonLogs = reader.read(true, true, null);
-
-      for (JsonLog jsonLog : jsonLogs) {
-        System.out.println(JsonWriter.toString(jsonLog, false, 0));
-      }
-    }
-    catch (Exception exception) {
-      exception.printStackTrace();
-    }
   }
 }

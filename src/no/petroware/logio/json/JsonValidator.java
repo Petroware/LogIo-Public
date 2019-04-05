@@ -893,45 +893,4 @@ public enum JsonValidator
 
     return messages;
   }
-
-  private static void scan(File directory)
-  {
-    assert directory != null : "directory cannot bw null";
-    assert directory.isDirectory() : "directory must be an actual directory";
-
-    File[] files = directory.listFiles();
-    if (files == null)
-      return;
-
-    for (File file : files) {
-      if (file.isDirectory())
-        scan(file);
-      else if (file.isFile()) {
-        byte[] content = Util.readContent(file, 2000);
-        if (JsonReader.isJsonFile(file, content) > 0.7) {
-          System.out.println("--- " + file.getPath());
-
-          try {
-            List<Message> messages = JsonValidator.getInstance().validate(file);
-            for (Message message : messages)
-              if (message.getLevel() == JsonValidator.Message.Level.SEVERE)
-                System.out.println(message);
-          }
-          catch (IOException exception) {
-            exception.printStackTrace();
-          }
-        }
-      }
-    }
-  }
-
-  /**
-   * Testing this class.
-   *
-   * @param arguments  Application arguments. Not used.
-   */
-  private static void main(String[] arguments)
-  {
-    scan(new File("C:/Users/main/Development/dev/jsonwelllogformat.org/Volve/"));
-  }
 }

@@ -556,22 +556,4 @@ public final class JsonReader
         inputStream.close();
     }
   }
-
-  private static void main(String[] arguments)
-  {
-    File file = new File("C:/Users/main/logdata/json/WLC_COMPOSITE_1.JSON");
-    JsonReader reader = new JsonReader(file);
-
-    try {
-      List<JsonLog> jsonLogs = reader.read(true, true, null);
-
-      for (JsonLog jsonLog : jsonLogs) {
-        JsonTable table = jsonLog.getTable("table1");
-        System.out.println(table);
-      }
-    }
-    catch (Exception exception) {
-      exception.printStackTrace();
-    }
-  }
 }

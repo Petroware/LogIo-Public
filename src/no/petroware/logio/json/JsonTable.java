@@ -361,20 +361,32 @@ public final class JsonTable
   {
     JsonObjectBuilder tableObjectBuilder = Json.createObjectBuilder();
 
+    //
+    // Attributes
+    //
     JsonArrayBuilder attributesArrayBuilder = Json.createArrayBuilder();
     for (String attribute : attributes_)
       attributesArrayBuilder.add(attribute);
     tableObjectBuilder.add("attributes", attributesArrayBuilder);
 
-    JsonArrayBuilder objectsArrayBuilder = Json.createArrayBuilder();
+    //
+    // Objects
+    //
+    JsonObjectBuilder objectsBuilder = Json.createObjectBuilder();
     for (Map.Entry<String,List<List<Object>>> entry : objects_.entrySet()) {
       String objectName = entry.getKey();
+
+      //
+      // Values
+      //
       List<List<Object>> values = entry.getValue();
 
       JsonArrayBuilder valuesArrayBuilder = Json.createArrayBuilder();
 
       for (List<Object> v : values) {
-        if (v.size() == 1) {
+        if (v.size() == 0)
+          JsonUtil.add(valuesArrayBuilder, null);
+        else if (v.size() == 1) {
           JsonUtil.add(valuesArrayBuilder, v.get(0));
         }
         else {
@@ -386,12 +398,9 @@ public final class JsonTable
         }
       }
 
-      JsonObjectBuilder objectObjectBuilder = Json.createObjectBuilder();
-      objectObjectBuilder.add(objectName, valuesArrayBuilder);
-
-      objectsArrayBuilder.add(objectObjectBuilder);
+      objectsBuilder.add(objectName, valuesArrayBuilder);
     }
-    tableObjectBuilder.add("objects", objectsArrayBuilder);
+    tableObjectBuilder.add("objects", objectsBuilder);
 
     return tableObjectBuilder.build();
   }
@@ -511,34 +520,5 @@ public final class JsonTable
 
 
     return s.toString();
-  }
-
-  private static void main(String[] arguments)
-  {
-    List<String> attributes = new ArrayList<>();
-    attributes.add("value");
-    attributes.add("unit");
-    attributes.add("description");
-
-    JsonTable table = new JsonTable("test", attributes);
-
-    table.addObject("MD");
-    table.addValue("MD", "value", 201.12);
-    table.addValue("MD", "value", 333.45);
-    table.addValue("MD", "unit", "m");
-    table.addValue("MD", "description", "Measured depth");
-
-    table.addObject("TVD");
-    table.addValue("TVD", "value", 932.1);
-    table.addValue("TVD", "unit", "m");
-    table.addValue("TVD", "description", "True vertical depth");
-
-    System.out.println(table);
-
-    JsonObject jsonObject = table.asJsonObject();
-    System.out.println(jsonObject);
-
-    JsonTable table2 = JsonTable.create("test2", jsonObject);
-    System.out.println(table2);
   }
 }

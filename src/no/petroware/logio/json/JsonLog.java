@@ -892,22 +892,4 @@ public final class JsonLog
 
     return s.toString();
   }
-
-  private static void main(String[] arguments)
-  {
-    java.io.File file = new java.io.File("C:/Users/main/logdata/json/WLC_COMPOSITE_1.JSON");
-    JsonReader reader = new JsonReader(file);
-
-    try {
-      List<JsonLog> jsonLogs = reader.read(true, true, null);
-
-      for (JsonLog jsonLog : jsonLogs) {
-        JsonObject header = jsonLog.getHeader();
-        System.out.println(header);
-      }
-    }
-    catch (Exception exception) {
-      exception.printStackTrace();
-    }
-  }
 }
