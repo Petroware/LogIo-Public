@@ -482,9 +482,6 @@ public final class JsonWriter
         String text = Double.isFinite(v) ? indexCurveFormatter.format(v) : "null";
         writer_.write(text);
       }
-      else if (value.getValueType() == JsonValue.ValueType.OBJECT && JsonTable.isTable((JsonObject) value)) {
-        writeObject((JsonObject) value, indentation.push());
-      }
       else {
         writeValue(value, indentation.push());
       }
