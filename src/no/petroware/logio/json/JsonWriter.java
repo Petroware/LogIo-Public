@@ -53,6 +53,9 @@ import no.petroware.logio.util.Util;
 public final class JsonWriter
   implements Closeable
 {
+  /** Platform independent new-line string. */
+  private static String NEWLINE = System.getProperty("line.separator");
+
   /** The physical disk file to write. */
   private final File file_;
 
@@ -63,7 +66,7 @@ public final class JsonWriter
   private final boolean isPretty_;
 
   /**
-   * The new line token according to pretty print mode. Either "\n" or "".
+   * The new line token according to pretty print mode. Either NEWLINE or "".
    * Cached for efficiency.
    */
   private final String newline_;
@@ -164,7 +167,7 @@ public final class JsonWriter
     file_ = null;
     outputStream_ = outputStream;
     isPretty_ = isPretty;
-    newline_ = isPretty_ ? "\n" : "";
+    newline_ = isPretty_ ? NEWLINE : "";
     spacing_ = isPretty_ ? " " : "";
     indentation_ = new Indentation(isPretty ? indentation : 0, "");
   }
@@ -190,7 +193,7 @@ public final class JsonWriter
     file_ = file;
     outputStream_ = null;
     isPretty_ = isPretty;
-    newline_ = isPretty_ ? "\n" : "";
+    newline_ = isPretty_ ? NEWLINE : "";
     spacing_ = isPretty_ ? " " : "";
     indentation_ = new Indentation(isPretty ? indentation : 0, "");
   }
