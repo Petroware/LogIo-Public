@@ -211,6 +211,18 @@ public final class JsonWriter
   }
 
   /**
+   * Get the specified string token as a quoted text suitable for writing to
+   * a JSON disk file, i.e. "null" if null, or properly escaped if non-null.
+   *
+   * @param value  Value to get as text. May be null.
+   * @return       The value as a JSON text. Never null.
+   */
+  private static String getQuotedText(String value)
+  {
+    return value != null ? JsonUtil.encode(value) : "null";
+  }
+
+  /**
    * Compute the width of the widest element of the column of the specified curve.
    *
    * @param curve      Curve to compute column width of. Non-null.
@@ -240,7 +252,7 @@ public final class JsonWriter
           text = formatter.format(Util.getAsDouble(value));
 
         else if (valueType == String.class)
-          text = JsonUtil.encode(value.toString());
+          text = getQuotedText(value.toString());
 
         else // Boolean and Integers
           text = value.toString();
@@ -251,18 +263,6 @@ public final class JsonWriter
     }
 
     return columnWidth;
-  }
-
-  /**
-   * Get the specified string token as a text suitable for writing to
-   * a JSON disk file, i.e. "null" if null, or properly quoted if non-null.
-   *
-   * @param value  Value to get as text. May be null.
-   * @return       The value as a JSON text. Never null.
-   */
-  private static String getText(String value)
-  {
-    return value != null ? '\"' + value + '\"' : "null";
   }
 
   /**
@@ -293,7 +293,7 @@ public final class JsonWriter
     else if (Number.class.isAssignableFrom(valueType))
       text = value.toString();
     else if (valueType == String.class)
-      text = JsonUtil.encode(value.toString());
+      text = getQuotedText(value.toString());
     else
       assert false : "Unrecognized valueType: " + valueType;
 
@@ -327,9 +327,7 @@ public final class JsonWriter
         break;
 
       case STRING :
-        writer_.write('\"');
-        writer_.write(((JsonString) jsonValue).getString());
-        writer_.write('\"');
+        writer_.write(getQuotedText(((JsonString) jsonValue).getString()));
         break;
 
       case FALSE :
@@ -666,7 +664,7 @@ public final class JsonWriter
       writer_.write(indentation.toString());
       writer_.write("\"name\":");
       writer_.write(spacing_);
-      writer_.write(getText(curve.getName()));
+      writer_.write(getQuotedText(curve.getName()));
       writer_.write(',');
       writer_.write(newline_);
 
@@ -674,7 +672,7 @@ public final class JsonWriter
       writer_.write(indentation.toString());
       writer_.write("\"description\":");
       writer_.write(spacing_);
-      writer_.write(getText(curve.getDescription()));
+      writer_.write(getQuotedText(curve.getDescription()));
       writer_.write(',');
       writer_.write(newline_);
 
@@ -682,7 +680,7 @@ public final class JsonWriter
       writer_.write(indentation.toString());
       writer_.write("\"quantity\":");
       writer_.write(spacing_);
-      writer_.write(getText(curve.getQuantity()));
+      writer_.write(getQuotedText(curve.getQuantity()));
       writer_.write(',');
       writer_.write(newline_);
 
@@ -690,7 +688,7 @@ public final class JsonWriter
       writer_.write(indentation.toString());
       writer_.write("\"unit\":");
       writer_.write(spacing_);
-      writer_.write(getText(curve.getUnit()));
+      writer_.write(getQuotedText(curve.getUnit()));
       writer_.write(',');
       writer_.write(newline_);
 
@@ -698,7 +696,7 @@ public final class JsonWriter
       writer_.write(indentation.toString());
       writer_.write("\"valueType\":");
       writer_.write(spacing_);
-      writer_.write(getText(JsonValueType.get(curve.getValueType()).toString()));
+      writer_.write(getQuotedText(JsonValueType.get(curve.getValueType()).toString()));
       writer_.write(',');
       writer_.write(newline_);
 

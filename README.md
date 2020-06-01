@@ -12,7 +12,7 @@ to use programming API.
 The open source version of Log I/O contains the Java accessor for the
 JSON Well Log Format.
 
-Log I/O web page: https://petroware.no/logio.html
+Log I/O web page: https://petroware.no/html/logio.html
 
 
 
@@ -40,9 +40,9 @@ lib/javax.json-1.1.3.jar
 
 ## API Documentation
 
-Java: https://petroware.no/logio/javadoc/index.html
+Java: https://petroware.no/products/logio/javadoc/index.html
 
-.Net: https://petroware.no/logio/doxygen/index.html
+.Net: https://petroware.no/products/logio/doxygen/index.html
 
 
 
