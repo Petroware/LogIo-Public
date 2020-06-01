@@ -2,8 +2,8 @@
 
 Log I/O is a library for reading and writing well log files.
 
-As of Q4/2018 Log I/O supports DLIS, LIS, LAS 2.0, LAS 3.0, BIT, XTF, ASC,
-SPWLA, CSV, and JSON Well Log Format. Log I/O wraps the complexity of these
+As of Q3/2020 Log I/O supports DLIS, LIS, LAS 2.0, LAS 3.0, BIT, XTF, ASC,
+SPWLA, CSV, XML (WITSML) and JSON Well Log Format. Log I/O wraps the complexity of these
 formats in a clean, complete, well documented, efficient and extremely simple
 to use programming API.
 
